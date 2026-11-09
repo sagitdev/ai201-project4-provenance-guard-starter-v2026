@@ -245,7 +245,7 @@
   | body isn't JSON, or isn't a JSON object | `invalid_json` |
   | `text` missing or not a string | `text_missing` |
   | `text` empty or only whitespace | `text_empty` |
-  | `text` too short to score (`detector.perplexity` raises `ValueError`) | `text_too_short` |
+  | `text` under 5 words — checked in `/submit` before the model runs, so a bad request never loads it (criteria.md #5) | `text_too_short` |
   | `text` longer than **50,000 characters** | `text_too_long` |
   | `creator_id` missing, empty, or not a string | `creator_id_missing` |
 
