@@ -31,6 +31,9 @@ from flask import Flask, jsonify, request
 import audit
 import config
 
+import detector
+# import 会不会让模型一启动就加载？不会。 看 detector.py：模型只在第一次调用 _load() 时才加载（这叫懒加载 lazy loading）。import 只是让 app.py "认识" detector 这个模块。这一点对第 5 条标准很重要：坏请求在调用 model_signal 之前就被拒绝，detector_loaded 就会一直是 false。
+
 app = Flask(__name__)
 
 
@@ -117,6 +120,7 @@ if config.RATE_LIMITING_ENABLED:
 
 # ── The worked example. Already works. Don't edit. ────────────────────────────
 
+#装饰器：@app.post("/ping") 写在函数上方，意思是"收到 POST /ping 请求时，调用下面这个函数"。
 @app.post("/ping")
 def ping():
     """
@@ -133,7 +137,7 @@ def ping():
     })
 
 
-@app.get("/health")
+@app.get("/health") # 报告服务是否在线、模型是否已加载、限流是否开启、日志有多少条。
 def health():
     """Is the service up, and has the model been downloaded yet?"""
     import detector
@@ -149,6 +153,18 @@ def health():
 
 
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
+def reject(error, message, creator_id="unknown", status=400):
+    """
+    A malformed request is a rejection, not a crash.
+
+    The route should never raise an exception on a bad request. That looks like
+    a broken service to the caller, and it looks like a broken route to you.
+    """
+    audit.log_rejection(creator_id=creator_id, reason=error)
+    return jsonify({
+        "error": error,
+        "message": message,
+    }), status
 
 @app.post("/submit")
 # @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
@@ -199,17 +215,58 @@ def submit():
     what should this do when `text` is missing, empty, or enormous? A crash on
     a malformed input is one of the most common real failures there is.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    # 去掉了 or {} 加了 or {}，坏 JSON 会悄悄变成空字典 {}，后面只会报"缺 text"，看不出真正的原因是 JSON 格式错了。去掉以后，坏 JSON 得到 None，就能返回准确的 invalid_json。
 
-    # TODO: delete this and build the route.
+    if not isinstance(payload, dict): #意思是"payload 是不是一个字典"。能同时挡住 3 种情况：不是 JSON（None）、JSON 是列表（["a"]）、JSON 是字符串（"hello"）。M1 Task 1 里提到过，列表没有 .get()，不挡住就会崩溃变成 500。
+        return reject("invalid_json", "Please send a JSON object with text and creator_id.")
+
+    creator_id = payload.get("creator_id")
+    if not isinstance(creator_id,str) or not creator_id.strip():
+        return reject("creator_id_missing","Please include a creator_id saying who wrote this.")
+
+    text = payload.get("text")
+    if not isinstance(text, str): #同时挡住"没有 text"（None）、text: null（None）、text: 123（数字）
+        return reject("text_missing", "Please include the text you'd like us to read.", creator_id)
+    if not text.strip(): # .strip() 去掉开头和结尾的空格、换行。只有空格的文字 strip 之后是 ""，not "" 为真，于是被拒绝。
+        return reject("text_empty", "The text is empty. Please paste in your writing.", creator_id)
+    if len(text) > config.MAX_TEXT_CHARS:
+        return reject(
+            "text_too_long",
+            f"Please keep submissions under {config.MAX_TEXT_CHARS:,} characters.", # 这叫 f-string：字符串前面加 f，{} 里的变量会被替换成它的值。:, 表示加千位分隔符，显示成 50,000。
+            creator_id,
+        )
+    if len(text.split()) < config.MIN_TEXT_WORDS:
+        return reject(
+            "text_too_short",
+            "Please submit at least a few sentences so we can read it properly.",
+            creator_id,
+        )
+
+    content_id = str(uuid.uuid4())# uuid4() 生成一个随机编号，str() 把它变成字符串，JSON 只认字符串。
+    model_score = detector.model_signal(text)
+    
+# 现在坏请求会写日志，但正常请求不会：判定做完就返回了，没留下记录。第 4 步要补上这一条。
+# 为什么重要： 下一步的 /appeal 要用 audit.entries_for(content_id) 去日志里查找这个 content_id。正常请求不写日志的话，所有申诉都会返回 404。
+    guess,label = "unsure","PLACEHOLDER" # milestone 5
+    confidence = model_score # milestone 4
+    audit.log_decision(
+        content_id = content_id,
+        creator_id = creator_id,
+        guess = guess,
+        model_score = model_score,
+        combined_score = confidence,
+        label = label,
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "guess": guess,        
+        "confidence": confidence, 
+        "label": label,  
+        "model_score": model_score,
+        "style_score": None,      # signal two arrives in milestone 4
+    })
 
 
 @app.post("/appeal")

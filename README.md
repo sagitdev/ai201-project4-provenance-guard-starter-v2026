@@ -124,11 +124,21 @@
 ```bash
 $ curl -X POST http://127.0.0.1:5000/submit \
   -H "Content-Type: application/json" \
-  -d '{"text": "...", "creator_id": "..."}'
+  -d '{"text": "My hometown is Changzhi, a city in Shanxi Province. It has four distinct seasons and a lot of green space.", "creator_id": "tank"}'
 ```
 
-```json
+<!-- Milestone 3 run: signal one only. style_score and label are placeholders
+     until milestones 4 and 5; this gets replaced with the final run. -->
 
+```json
+{
+  "confidence": 0.6769,
+  "content_id": "d1aa33c3-b470-42e1-abd8-2418b663dc56",
+  "guess": "unsure",
+  "label": "PLACEHOLDER",
+  "model_score": 0.6769,
+  "style_score": null
+}
 ```
 
 **An appeal**
@@ -150,7 +160,29 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 ```
 
 ```json
-
+{
+  "count": 2,
+  "entries": [
+    {
+      "creator_id": "tank",
+      "event": "rejected",
+      "reason": "text_missing",
+      "status": "rejected",
+      "timestamp": "2026-11-10T04:55:24+00:00"
+    },
+    {
+      "combined_score": 0.6769,
+      "content_id": "d1aa33c3-b470-42e1-abd8-2418b663dc56",
+      "creator_id": "tank",
+      "guess": "unsure",
+      "label": "PLACEHOLDER",
+      "model_score": 0.6769,
+      "status": "decided",
+      "style_score": null,
+      "timestamp": "2026-11-10T19:41:54+00:00"
+    }
+  ]
+}
 ```
 
 ---
