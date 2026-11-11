@@ -1002,25 +1002,67 @@ shape. One change matters when reading it:
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+**My limits:** 5 per minute, 50 per day
 
 **Why those numbers and not others:**
-<!-- Think about two people: a real writer submitting their own work a few
-     times an hour, and a script sending a thousand variations to map your
-     thresholds. Your numbers have to be liveable for the first and hostile to
-     the second. -->
 
-**What a caller counts as:** <!-- per address, or per creator_id? They fail
-differently — one script can look like a thousand callers, and one household
-can look like one. -->
+- **5 per minute** stops bursts. A writer who changes a word and resubmits to
+  see the new score can do that 3 to 5 times in a minute at most. Anything
+  faster isn't someone reading the results. It also has to sit between two
+  hard limits: below 15, so `--flood 15` shows a 429, and at least 3, because
+  `run_eval.py` sends the same creator_id three times in a row, once per trial.
+- **50 per day** stops threshold mapping, which depends on the total number of
+  tries, not their speed. A very busy writer submits about 3 pieces a day and
+  revises each about 5 times, so around 15 submissions. 50 leaves 2 to 3 times
+  headroom. A script that wants to try 1,000 variations needs 20 days at 50 a
+  day. The starter's default of 200 a day would let it finish in 5.
+
+**What a caller counts as:** per `creator_id`, falling back to the caller's
+address when `creator_id` is missing, empty, not a string or over 100
+characters (`rate_limit_key` in `app.py`). This only stops a script that keeps
+one identity. `creator_id` is whatever the caller writes, so a script that
+sends a new one with every request looks like a thousand different writers and
+never hits the limit. Per-address limiting would catch that script, but it
+would also put a whole household or classroom behind one shared address under
+a single limit. Neither choice fixes the real problem, which is that the caller
+picks their own identity. The limit counts are also kept in memory, so a
+restart resets them.
 
 **The run of status codes when I pushed past it:**
 
 <!-- python run_attacks.py --flood 15 -->
 
 ```
-
+200 200 200 200 200 429 429 429 429 429 429 429 429 429 429
 ```
+
+The first 5 submissions within one minute were judged, and requests 6 to 15
+were rejected. All 10 rejections are in `logs/audit.jsonl` as
+`"reason": "rate_limited", "limit": "5 per 1 minute"`.
+
+**What I considered and left out: a cooldown after a 429.** The limit resets
+60 seconds after the first request in the window, so a caller who hits the
+limit can carry on a minute later. I considered adding a penalty, where hitting
+the limit blocks that caller for 10 minutes. Flask-Limiter doesn't do this, so
+it would need my own code: record an "unblocked at" time on every 429, check it
+at the top of `/submit`, and send a `Retry-After` header so the caller knows how
+long to wait. I didn't add it, for three reasons:
+
+- **Most of the cost lands on real writers.** A writer who clicks submit one
+  time too many would be locked out for 10 minutes, for a single slip.
+- **It doesn't stop the attack it's aimed at.** A script that sends a new
+  `creator_id` with every request never hits the limit, so it never gets the
+  cooldown either.
+- **The daily cap already does that job.** Threshold mapping depends on the
+  total number of tries. 50 a day makes 1,000 tries take 20 days, whatever the
+  pace within a day.
+
+**Future work:** add the cooldown once callers have identities they can't make
+up themselves, such as logged-in accounts. Then a lockout would actually land
+on the person who caused it. The length should grow with each repeat (1 minute,
+then 10, then an hour), so one slip costs little and repeated flooding costs a
+lot. That needs shared storage such as Redis instead of `memory://`, so the
+block survives a restart.
 
 ---
 

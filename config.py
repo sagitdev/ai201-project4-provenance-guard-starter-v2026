@@ -105,10 +105,15 @@ AI_THRESHOLD = 0.65
 # an hour, and a script sending a thousand variations to map your thresholds.
 # Your README has to say why your numbers and not others.
 
-RATE_LIMITING_ENABLED = os.getenv("AI201_RATE_LIMITS", "0") == "1"
+# RATE_LIMITING_ENABLED = os.getenv("AI201_RATE_LIMITS", "0") == "1"
+RATE_LIMITING_ENABLED = True
 
-RATE_LIMIT_PER_MINUTE = 10
-RATE_LIMIT_PER_DAY = 200
+# 每分钟 5 次：作者改一个词再交一次看分数，一分钟最多 3 到 5 次；更多就不像在读结果了。
+#   还要满足：< 15（--flood 15 才能看到 429），≥ 3（run_eval 同一个 creator_id 连跑 3 次）。
+# 每天 50 次：勤奋的作者一天 3 篇 × 改 5 次 ≈ 15 次，留 2 到 3 倍余量。
+#   脚本要试 1000 个变体摸阈值，需要 20 天；原来的 200/天 只要 5 天。
+RATE_LIMIT_PER_MINUTE = 5
+RATE_LIMIT_PER_DAY = 50
 
 # Flask-Limiter warns loudly without this. In-memory is right for one laptop
 # and wrong for anything real — a restart forgets every count, and two copies
