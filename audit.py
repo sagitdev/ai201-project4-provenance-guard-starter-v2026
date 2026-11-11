@@ -27,10 +27,13 @@ import config
 
 _lock = threading.Lock()
 
-
+# datetime 和 timezone 来自 Python 自带的库，在 audit.py:24 导入：from datetime import datetime, timezone
+# timestamp是在 这个audit.py 里自动生成的。这也是为什么app.py调用 audit.log_decision(...)写日志时没有传 timestamp，它却出现在了日志里。
+# 日志统一用 UTC，是为了不同地方的服务器记录的时间能直接比较。
+# 为什么让 audit.py 自动生成，而不是让你传进去？如果靠调用者自己传，总有一处会漏掉；调用者没法随便填一个时间。审计日志的价值就在于记录真实发生的时间；所有记录用同一种格式、同一个时区，Unit 8 排序、比较时不会出错
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
+# 函数名前面的下划线 _now 是 Python 的一个约定，意思是"这是模块内部用的函数，外面的代码不要直接调用"。和 detector.py 里的 _load、_model 是同一个意思。
 
 def log_decision(
     content_id: str,

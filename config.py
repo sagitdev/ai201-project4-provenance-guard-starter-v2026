@@ -57,8 +57,10 @@ MIN_TEXT_WORDS = 5
 # down BEFORE you code it, and to put the numbers in your README. Whatever you
 # decide, it goes here.
 
-WEIGHT_MODEL_SIGNAL = 0.5
-WEIGHT_STYLE_SIGNAL = 0.5
+WEIGHT_MODEL_SIGNAL = 0.7
+WEIGHT_STYLE_SIGNAL = 0.3
+
+DISAGREEMENT_GAP = 0.5  # how far apart the two signals have to be to count as a split
 
 
 # ─── Thresholds (Milestone 5) ────────────────────────────────────────────────

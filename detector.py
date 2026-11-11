@@ -69,9 +69,9 @@ def _load():
         ) from exc
 
     try:
-        _tokenizer = AutoTokenizer.from_pretrained(config.DETECTOR_MODEL)
-        _model = AutoModelForCausalLM.from_pretrained(config.DETECTOR_MODEL)
-        _model.eval()
+        _tokenizer = AutoTokenizer.from_pretrained(config.DETECTOR_MODEL)#（分词器）负责把文字切成模型认识的编号（token）。model 是 GPT-2 本身。
+        _model = AutoModelForCausalLM.from_pretrained(config.DETECTOR_MODEL) 
+        _model.eval() #把模型切到"推理模式"（只用不训练）
     except Exception as exc:  # noqa: BLE001
         raise DetectorUnavailable(
             f"Couldn't load '{config.DETECTOR_MODEL}': {exc}\n"
@@ -96,17 +96,17 @@ def perplexity(text: str) -> float:
 
     encoded = tokenizer(
         text,
-        return_tensors="pt",
-        truncation=True,
+        return_tensors="pt", 
+        truncation=True, # 表示超出 400 个 token 的部分直接截掉。
         max_length=config.DETECTOR_MAX_TOKENS,
     )
     input_ids = encoded["input_ids"]
 
     # Two tokens is not enough to be surprised by anything.
-    if input_ids.shape[1] < 3:
+    if input_ids.shape[1] < 3: # 文本太短（少于 3 个 token）时抛出 ValueError。写 /submit 时要处理这个异常，否则服务会返回 500 错误。
         raise ValueError("Text is too short to score — a few sentences at least.")
 
-    with torch.no_grad():
+    with torch.no_grad(): # 表示不计算梯度，因为不训练，这样更省内存。
         output = model(input_ids, labels=input_ids)
 
     # The model's loss here IS mean negative log-likelihood per token.
@@ -140,7 +140,7 @@ def warm_up() -> str:
     _load()
     return f"{config.DETECTOR_MODEL} loaded and ready."
 
-
+# 表示直接运行这个文件时才执行下面的代码。所以 python detector.py "一段文字" 可以单独测试这个信号。被别的文件 import 时，这段代码不会执行。
 if __name__ == "__main__":
     import sys
 

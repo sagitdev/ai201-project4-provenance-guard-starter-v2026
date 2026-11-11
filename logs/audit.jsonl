@@ -1,2 +1,3 @@
 {"timestamp": "2026-11-10T04:55:24+00:00", "creator_id": "tank", "event": "rejected", "status": "rejected", "reason": "text_missing"}
 {"timestamp": "2026-11-10T19:41:54+00:00", "content_id": "d1aa33c3-b470-42e1-abd8-2418b663dc56", "creator_id": "tank", "guess": "unsure", "model_score": 0.6769, "style_score": null, "combined_score": 0.6769, "label": "PLACEHOLDER", "status": "decided"}
+{"timestamp": "2026-11-11T01:12:32+00:00", "content_id": "b15cde60-b531-49f4-af15-e49bd060de66", "creator_id": "tank", "guess": "unsure", "model_score": 0.7891, "style_score": 0.232, "combined_score": 0.622, "label": "PLACEHOLDER", "status": "decided"}

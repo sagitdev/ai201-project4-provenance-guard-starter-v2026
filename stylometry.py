@@ -33,13 +33,13 @@ anything together:
 import re
 import statistics
 
-
+# 把文本切成句子的列表（按 . ! ? 切）
 def sentences(text: str) -> list[str]:
     """Split into sentences. Rough and good enough — given to you."""
     parts = re.split(r"(?<=[.!?])\s+", text.strip())
     return [p for p in parts if p.strip()]
 
-
+# 把文本切成小写单词的列表，去掉标点
 def words(text: str) -> list[str]:
     """Split into lowercase words, punctuation stripped. Given to you."""
     return re.findall(r"[a-z0-9']+", text.lower())
@@ -47,6 +47,7 @@ def words(text: str) -> list[str]:
 
 # ── The three measures — YOU BUILD THESE ─────────────────────────────────────
 
+# 指标1：句长离散度
 def sentence_length_spread(text: str) -> float:
     """
     How much sentence length varies. ← TODO
@@ -65,9 +66,16 @@ def sentence_length_spread(text: str) -> float:
     before the attack set decides for you.
     """
     # TODO: replace this
-    return 0.0
+    lengths = [len(words(s)) for s in sentences(text)] # 对每个句子 s，数一下它有几个词，把结果收集成一个列表
+    if len(lengths) < 2: # 只有一句话时，没有"变化"可言，而且 statistics.stdev 遇到少于 2 个值会报错（docstring 里专门提醒过）。先返回 0.0，后面在 style_signal 里决定怎么处理
+        return 0.0       # 没有句子，是[],len是0 ； 一句话，是[15],len是1；两句话len是2；所以是小于2
+    return statistics.stdev(lengths) / statistics.mean(lengths)
+# stdev / mean：标准差 ÷ 平均值，叫变异系数（coefficient of variation）
+# 标准差：数字之间差别有多大。[10, 12, 11, 10] 很小，[11, 24, 4, 4] 很大
+# 为什么要除以平均值：一篇平均每句 30 词的文章，标准差天然比平均每句 8 词的大。除以平均值，长句文章和短句文章才能放在一起比较
+# 方向：数值越小 → 句子越整齐 → 越像 AI
 
-
+# 指标2：用词多样性
 def type_token_ratio(text: str) -> float:
     """
     Unique words over total words. ← TODO
@@ -81,9 +89,14 @@ def type_token_ratio(text: str) -> float:
     that alone can look like a signal.
     """
     # TODO: replace this
-    return 0.0
+    tokens = words(text)
+    if not tokens: # 没有词时，返回 0.0，后面在 style_signal 里决定怎么处理
+        return 0.0
+    return len(set(tokens)) / len(tokens) # set() 去重，len(set(...)) 是独特词的数量，len(tokens) 是总词数
+# 方向：数值越小 → 重复越多 → 越像 AI
+# 但是注意 M1 发现的问题：文本越长，这个值天然越低
 
-
+# 指标3：标点密度
 def punctuation_density(text: str) -> float:
     """
     How much punctuation, relative to length. ← TODO
@@ -95,7 +108,12 @@ def punctuation_density(text: str) -> float:
         writers.
     """
     # TODO: replace this
-    return 0.0
+    tokens = words(text)
+    if not tokens: # 没有词时，返回 0.0，后面在 style_signal 里决定怎么处理
+        return 0.0
+    marks = re.findall(r"[,;:()!?\u2014\u2013]", text) # 只算逗号、分号、冒号、括号、问号、感叹号、长破折号（—）和短破折号（–），不算句号; 为什么不算句号：每句话都有句号，没有区分度。docstring 里说过，分号和破折号更能体现个人习惯
+    return len(marks) / len(tokens) # 标点数 ÷ 词数
+# 方向：暂时不确定！ AI 写作常用很多逗号，ChatGPT 还特别爱用长破折号 —；但人写作也会用。这个方向要看数据再决定。
 
 
 # ── Combining them ───────────────────────────────────────────────────────────
@@ -123,7 +141,16 @@ def style_signal(text: str) -> float:
     to signal one, and it is plain writing that gets accused.
     """
     # TODO: replace this
-    return 0.5
+    if len(sentences(text)) < 3:  # 少于三句话时，返回 0.5，后面在 scoring.combine_signals 里决定怎么处理
+        return 0.5
+    # Only spread is used. TTR and punctuation overlapped between AI and my own
+    # writing in round 3 (see README Calibration Log), so they get weight 0.
+    spread = sentence_length_spread(text)
+    SPREAD_AI = 0.1
+    SPREAD_HUMAN = 0.6
+    score = (SPREAD_HUMAN - spread) / (SPREAD_HUMAN - SPREAD_AI)
+    return round(min(max(score, 0.0), 1.0), 4)
+
 
 
 if __name__ == "__main__":

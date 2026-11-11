@@ -53,9 +53,11 @@ def combine_signals(model_score: float, style_score: float) -> float:
     write a different rule.
     """
     # TODO: replace this
+    score = config.WEIGHT_MODEL_SIGNAL * model_score + config.WEIGHT_STYLE_SIGNAL * style_score
+    if abs(model_score - style_score) >= config.DISAGREEMENT_GAP:
+        score = min(score, config.AI_THRESHOLD - 0.01)
     return (
-        config.WEIGHT_MODEL_SIGNAL * model_score
-        + config.WEIGHT_STYLE_SIGNAL * style_score
+        round(score, 4)
     )
 
 

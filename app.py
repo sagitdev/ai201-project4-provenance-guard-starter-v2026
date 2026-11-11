@@ -32,6 +32,8 @@ import audit
 import config
 
 import detector
+import scoring
+import stylometry
 # import 会不会让模型一启动就加载？不会。 看 detector.py：模型只在第一次调用 _load() 时才加载（这叫懒加载 lazy loading）。import 只是让 app.py "认识" detector 这个模块。这一点对第 5 条标准很重要：坏请求在调用 model_signal 之前就被拒绝，detector_loaded 就会一直是 false。
 
 app = Flask(__name__)
@@ -245,16 +247,17 @@ def submit():
 
     content_id = str(uuid.uuid4())# uuid4() 生成一个随机编号，str() 把它变成字符串，JSON 只认字符串。
     model_score = detector.model_signal(text)
-    
+    style_score = stylometry.style_signal(text)   
 # 现在坏请求会写日志，但正常请求不会：判定做完就返回了，没留下记录。第 4 步要补上这一条。
 # 为什么重要： 下一步的 /appeal 要用 audit.entries_for(content_id) 去日志里查找这个 content_id。正常请求不写日志的话，所有申诉都会返回 404。
     guess,label = "unsure","PLACEHOLDER" # milestone 5
-    confidence = model_score # milestone 4
+    confidence = scoring.combine_signals(model_score, style_score) # milestone 4
     audit.log_decision(
         content_id = content_id,
         creator_id = creator_id,
         guess = guess,
         model_score = model_score,
+        style_score = style_score,
         combined_score = confidence,
         label = label,
     )
@@ -265,7 +268,7 @@ def submit():
         "confidence": confidence, 
         "label": label,  
         "model_score": model_score,
-        "style_score": None,      # signal two arrives in milestone 4
+        "style_score": style_score,     
     })
 
 
