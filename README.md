@@ -1206,26 +1206,162 @@ unlucky piece. The label promises "a person can see things our check can't",
 but the real problem is that the check couldn't see anything here, and it gave
 no sign of that.
 
+### Extra probes: non-English human writing (outside the attack set)
+
+MF07 raised a question the attack set doesn't answer: is this an Arabic
+problem, or does it happen with every language that isn't English? I sent
+three public-domain human texts with `probe_languages.py`, each under its own
+`creator_id`, at 2026-11-11T03:38:58Z. I changed nothing in the system first.
+The right answer for all three is **human**.
+
+| Probe | Text | Words by `text.split()` | Status | Guess | Combined | Model | Style |
+|---|---|---|---|---|---|---|---|
+| `probe_zh` | Lu Xun, *故乡* (1921), opening, 3 sentences | **1** | **400** `text_too_short` | — | — | — | — |
+| `probe_ru1` | Tolstoy, *Anna Karenina* (1877), first sentence | 12 | 200 | **ai** | **0.817** | 0.9531 | 0.5 |
+| `probe_ru3` | the same, first three sentences | 49 | **500** | — | — | — | — |
+
+What came back:
+
+- **Chinese never reached a signal.** Chinese puts no spaces between words, so
+  `text.split()` sees one "word" and the route rejects it as too short. A
+  writer who pasted a whole paragraph is told it is too short. The writer is
+  turned away, and the reason they're given is wrong.
+- **One Russian sentence reproduces MF07 with a higher score.** The style
+  signal returned its fewer-than-3-sentences fallback of 0.5. The model signal
+  was 0.9531, well above 0.714, the model score at which `0.7 × model +
+  0.3 × 0.5` reaches the 0.65 AI threshold.
+- **Three Russian sentences crash the service.** With enough sentences, the
+  style signal stops falling back and actually computes. It then fails at the
+  same line as MF04: `ZeroDivisionError` at `stylometry.py:72`
+  (`sentence_length_spread`). Like MF04, this crash wrote **no audit entry**.
+  The log for this probe run has `probe_zh` and `probe_ru1`, and nothing for
+  `probe_ru3`.
+
+The three probes fail in three different ways: turned away for the wrong
+reason, accused with high confidence, or a crash. That makes MF07 one
+instance of a wider pattern, not a one-off. I'll diagnose the mechanism in
+Run Log and Verdicts.
+
 
 ---
 
 ## Run Log and Verdicts
 
-<!-- Your five criteria across three trials. `run_eval.py --label before`. -->
+**How it was run (before any fix), 2026-11-10:**
+
+- **Criteria 1–3:** `python run_eval.py --label before`, after a fresh
+  restart. It runs each scenario in `scenarios.py` three times.
+  Output: `results/run_2026-11-10_2053_before.md`.
+- **Criteria 4–5:** `python run_criteria_4_5.py --trial N --label before`,
+  once for each N = 1, 2, 3, with `app.py` restarted before every trial.
+  Criterion 5 requires a fresh start, and the restart also resets the
+  address-based rate-limit count. Output:
+  `results/criteria45_before_trial{1,2,3}_*.json`. `run_eval.py` only sends to
+  `/submit`, and a `bodies` scenario can't hold a JSON list, so these two
+  criteria needed their own runner. It is a test tool and changes nothing in
+  the service.
+- Test inputs are fixed in `scenarios.py`, including where each text came
+  from, the five texts for criterion 2 (randomly drawn before the run, seed
+  recorded), and exactly which sentences of each mixed piece I rewrote.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |
+| 1. My own writing is not called AI | 0 of 10 ai **and** ≤ 3 unsure | 0 ai · **7 unsure** · 3 human | 0 ai · **7 unsure** · 3 human | 0 ai · **7 unsure** · 3 human | *(M4)* |
+| 2. AI and my writing score far apart | AI avg − my avg ≥ 0.30 | 0.6647 − 0.4618 = **0.203** | **0.203** | **0.203** | *(M4)* |
+| 3. Labels reachable, ordinary AI caught | ≥ 3 of 5 AI essays ai **and** ≥ 2 of 3 mixed unsure | AI 3/5 · mixed unsure 2/3 | 3/5 · 2/3 | 3/5 · 2/3 | *(M4)* |
+| 4. Appeals always recorded, invalid ones change nothing | 5/5 valid pass all checks · 3/3 invalid get 403/400/404 · 0 under_review added | 5/5 · 3/3 · 0 | 5/5 · 3/3 · 0 | 5/5 · 3/3 · 0 | *(M4)* |
+| 5. Bad input gets a clear 400, never crashes | 9/9 400 with error+message · 0 500 · 9/9 logged rejected · detector not loaded | 9/9 · 0 · 9/9 · not loaded | 9/9 · 0 · 9/9 · not loaded | 9/9 · 0 · 9/9 · not loaded | *(M4)* |
 
-**Real output from one trial**, pasted as text, naming the file and function
-that produced it:
+**All three trials were identical** for every text, down to the fourth
+decimal place. Neither signal is random, so this is what a stable pipeline
+should do. It means the results held, not that a step was skipped.
+
+**Per-text scores, criteria 1–3** (identical in all three trials)
+
+| Text | Group | Combined | Model | Style | Label |
+|---|---|---|---|---|---|
+| #1 cats (hard: plain) | C1 | 0.622 | 0.7891 | 0.232 | unsure |
+| #2 retail | C1 | 0.5744 | 0.5825 | 0.5556 | unsure |
+| #3 music | C1, C2 | 0.5016 | 0.3977 | 0.7439 | unsure |
+| #4 packages | C1, C2 | 0.5739 | 0.4878 | 0.7747 | unsure |
+| #5 weakness | C1, C2 | 0.2345 | 0.335 | 0.0 | human |
+| #6 library | C1 | 0.5286 | 0.5394 | 0.5033 | unsure |
+| #7 repo (hard: uniform formal) | C1 | 0.5584 | 0.5702 | 0.5307 | unsure |
+| #8 debug (hard: formulaic) | C1 | 0.2132 | 0.2636 | 0.0955 | human |
+| #9 sorry | C1, C2 | 0.5216 | 0.6223 | 0.2867 | unsure |
+| #10 meeting | C1, C2 | 0.4772 | 0.6817 | 0.0 | human |
+| AI1 reading | C2, C3 | 0.7989 | 0.8224 | 0.744 | ai |
+| AI2 weekend | C2, C3 | 0.6844 | 0.8245 | 0.3574 | ai |
+| AI3 mom | C2, C3 | 0.7399 | 0.8624 | 0.4542 | ai |
+| AI4 book | C2, C3 | 0.5822 | 0.6866 | 0.3387 | unsure |
+| AI5 talking | C2, C3 | 0.5181 | 0.4284 | 0.7275 | unsure |
+| M1 skill (74% mine) | C3 | 0.5644 | 0.4852 | 0.7493 | unsure |
+| M2 travel (44% mine) | C3 | 0.7442 | 0.7901 | 0.637 | ai |
+| M3 home (52% mine) | C3 | 0.5017 | 0.5378 | 0.4175 | unsure |
+
+**Real output from trial 1**
+
+Criteria 1–3 come from `run_eval.py::main` against `app.py::submit`, copied
+from `results/run_2026-11-10_2053_before.md`. I left out the `label` field
+only to save space. It is always one of the three fixed strings for the
+`guess` shown. `sent` is the first 70 characters of the text, as
+`run_eval.py` records it.
 
 ```json
+--- criterion 1 · c1_my_writing · trial 1
+{"status": 200, "guess": "unsure", "confidence": 0.622, "model_score": 0.7891, "style_score": 0.232, "sent": "I have two cats. One is a white cat called Bingbing, another is an ora"}
+{"status": 200, "guess": "unsure", "confidence": 0.5744, "model_score": 0.5825, "style_score": 0.5556, "sent": "I worked for six years in the luxury retail industry, so I know the re"}
+{"status": 200, "guess": "unsure", "confidence": 0.5016, "model_score": 0.3977, "style_score": 0.7439, "sent": "I love pop music, new Jazz and some classic American country music. Fo"}
+{"status": 200, "guess": "unsure", "confidence": 0.5739, "model_score": 0.4878, "style_score": 0.7747, "sent": "During my first course in the master program, I really hope to create "}
+{"status": 200, "guess": "human", "confidence": 0.2345, "model_score": 0.335, "style_score": 0.0, "sent": "Sometimes I focus too much on supporting others. In group projects or "}
+{"status": 200, "guess": "unsure", "confidence": 0.5286, "model_score": 0.5394, "style_score": 0.5033, "sent": "I go to the PCC library everyday, for study. When I study at home, the"}
+{"status": 200, "guess": "unsure", "confidence": 0.5584, "model_score": 0.5702, "style_score": 0.5307, "sent": "This is a repository that shows what got built. It rarely shows why: t"}
+{"status": 200, "guess": "human", "confidence": 0.2132, "model_score": 0.2636, "style_score": 0.0955, "sent": "How I narrowed it down？First, look for the pattern. 100 identical erro"}
+{"status": 200, "guess": "unsure", "confidence": 0.5216, "model_score": 0.6223, "style_score": 0.2867, "sent": "I’m very sorry, but I forgot to submit last week’s assignment. May I s"}
+{"status": 200, "guess": "human", "confidence": 0.4772, "model_score": 0.6817, "style_score": 0.0, "sent": "After today’s meeting, I’m a bit confused. I heard that two teammates "}
+--- criterion 2 · c2_mine_five · trial 1   (the AI group is c2c3_ai_essays below)
+{"status": 200, "guess": "unsure", "confidence": 0.5016, "model_score": 0.3977, "style_score": 0.7439, "sent": "I love pop music, new Jazz and some classic American country music. Fo"}
+{"status": 200, "guess": "unsure", "confidence": 0.5739, "model_score": 0.4878, "style_score": 0.7747, "sent": "During my first course in the master program, I really hope to create "}
+{"status": 200, "guess": "human", "confidence": 0.2345, "model_score": 0.335, "style_score": 0.0, "sent": "Sometimes I focus too much on supporting others. In group projects or "}
+{"status": 200, "guess": "unsure", "confidence": 0.5216, "model_score": 0.6223, "style_score": 0.2867, "sent": "I’m very sorry, but I forgot to submit last week’s assignment. May I s"}
+{"status": 200, "guess": "human", "confidence": 0.4772, "model_score": 0.6817, "style_score": 0.0, "sent": "After today’s meeting, I’m a bit confused. I heard that two teammates "}
+--- criteria 2 and 3 · c2c3_ai_essays · trial 1
+{"status": 200, "guess": "ai", "confidence": 0.7989, "model_score": 0.8224, "style_score": 0.744, "sent": "Reading is important because it opens doors to knowledge and new ideas"}
+{"status": 200, "guess": "ai", "confidence": 0.6844, "model_score": 0.8245, "style_score": 0.3574, "sent": "On a typical weekend, I try to balance rest and productivity. On Satur"}
+{"status": 200, "guess": "ai", "confidence": 0.7399, "model_score": 0.8624, "style_score": 0.4542, "sent": "My mom is one of the most important people in my life. She is hardwork"}
+{"status": 200, "guess": "unsure", "confidence": 0.5822, "model_score": 0.6866, "style_score": 0.3387, "sent": "One book I love is To Live by Yu Hua. It tells the story of Fugui, a m"}
+{"status": 200, "guess": "unsure", "confidence": 0.5181, "model_score": 0.4284, "style_score": 0.7275, "sent": "I’m honestly not sure whether what I experience counts as “enjoyment” "}
+--- criterion 3 · c3_mixed · trial 1
+{"status": 200, "guess": "unsure", "confidence": 0.5644, "model_score": 0.4852, "style_score": 0.7493, "sent": "Learning a new skill as an adult can be challenging, but it is also ve"}
+{"status": 200, "guess": "ai", "confidence": 0.7442, "model_score": 0.7901, "style_score": 0.637, "sent": "People like to travel for many reasons. First, people can escape from "}
+{"status": 200, "guess": "unsure", "confidence": 0.5017, "model_score": 0.5378, "style_score": 0.4175, "sent": "Working from home has several clear advantages. The biggest benefit is"}
+```
 
+Criteria 4–5 come from `run_criteria_4_5.py::criterion_5` and `::criterion_4`
+against `app.py::submit` and `app.py::appeal`, copied from
+`results/criteria45_before_trial1_2026-11-10_205202.json`. For criterion 5
+each line is `case` and `status`, followed by the response body as returned.
+For criterion 4 the line shows one of the five valid appeals, and the three
+invalid ones.
+
+```json
+--- criterion 5 · trial 1 · nine bad requests to /submit
+{"case": "no text field", "status": 400, "error": "text_missing", "message": "Please include the text you'd like us to read."}
+{"case": "text is empty string", "status": 400, "error": "text_empty", "message": "The text is empty. Please paste in your writing."}
+{"case": "text is only whitespace", "status": 400, "error": "text_empty", "message": "The text is empty. Please paste in your writing."}
+{"case": "text is null", "status": 400, "error": "text_missing", "message": "Please include the text you'd like us to read."}
+{"case": "text is a number", "status": 400, "error": "text_missing", "message": "Please include the text you'd like us to read."}
+{"case": "fewer than 5 words", "status": 400, "error": "text_too_short", "message": "Please submit at least a few sentences so we can read it properly."}
+{"case": "50,001 characters", "status": 400, "error": "text_too_long", "message": "Please keep submissions under 50,000 characters."}
+{"case": "body is a JSON list", "status": 400, "error": "invalid_json", "message": "Please send a JSON object with text and creator_id."}
+{"case": "no creator_id", "status": 400, "error": "creator_id_missing", "message": "Please include a creator_id saying who wrote this."}
+{"fresh_start (detector_loaded false before)": true, "returned 400": 9, "400 with both error and message": 9, "returned 500": 0, "returned 429": 0, "new log entries": 9, "new entries with status rejected": 9, "detector_loaded after": false}
+--- criterion 4 · trial 1
+{"content_id": "3c38e6f5-d699-44d6-948d-8199d4a2d938", "reasoning": "I wrote this myself (c4_t1_writer1, trial 1).", "status": 200, "response": {"content_id": "3c38e6f5-d699-44d6-948d-8199d4a2d938", "message": "We've received your appeal. A person will review it.", "status": "under_review"}}
+{"case": "wrong creator_id", "expected": 403, "status": 403, "error": "not_your_content"}
+{"case": "attestation false", "expected": 400, "status": 400, "error": "attestation_required"}
+{"case": "nonexistent content_id", "expected": 404, "status": 404, "error": "content_not_found"}
+{"submissions that returned 200": 5, "valid appeals: 200 + under_review": 5, "valid appeals: exactly one new under_review entry": 5, "valid appeals: entry carries the reasoning": 5, "valid appeals: original decided entry unchanged": 5, "invalid appeals: got the expected status": 3, "invalid appeals: under_review entries added": 0}
 ```
 
 **Diagnoses**
