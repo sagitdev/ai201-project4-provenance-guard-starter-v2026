@@ -499,6 +499,53 @@ The anchors come from the data: the most even AI text is 0.11, and only my
 writing went above 0.6. Checks: the cats text gives 0.232; a two-sentence
 text gives 0.5.
 
+### The four calibration inputs
+
+With both signals and the combining rule wired into `/submit` (weights
+0.7 / 0.3, disagreement gap 0.5), I sent the four calibration inputs through
+the running service. The label thresholds are still the placeholders
+(below 0.35 human, above 0.65 AI).
+
+The lightly edited AI text is the round 3 *mom* text with my own edits
+(roughly 10–20%): I split one sentence in two (*"I never heard her complain
+about this."*), and changed a few words and phrases (*strength → power*,
+*often → every day*, *when things get difficult → when I meet
+difficulties*).
+
+| Input | Text | model | style | gap | confidence | Lands in | As intended? |
+|---|---|---|---|---|---|---|---|
+| Clearly AI | A1 reading | 0.82 | 0.74 | 0.08 | **0.80** | AI | ✅ |
+| Clearly human | H0 Changzhi | 0.37 | 0.55 | 0.18 | **0.43** | unsure | ⚠️ should be human |
+| Plain human | H1 cats | 0.79 | 0.23 | 0.56 | **0.62** | unsure | ✅ not accused |
+| Lightly edited AI | A3 mom, edited | 0.86 | 0.45 | 0.41 | **0.74** | AI | ✅ (see below) |
+
+**What each one shows**
+
+- **Clearly AI (0.80):** both signals agree (gap 0.08), so the system is
+  confident, and right.
+- **Clearly human (0.43):** the biggest problem left. This text is full of my
+  spelling mistakes and is obviously human, yet it doesn't reach the human
+  label. The signals are not the issue: the human line (0.35) is too low.
+  That is the threshold question noted under *The combining rule*, for
+  milestone 5.
+- **Plain human (0.62):** signal one misreads it (0.79), the style signal
+  disagrees (0.23), and the combination stops in unsure. The two signals
+  checking each other works as designed — but only 0.03 below the AI line.
+- **Lightly edited AI (0.74):** my edits barely moved it.
+
+  | | original A3 | my edited version |
+  |---|---|---|
+  | model | 0.89 | 0.86 |
+  | spread | 0.36 | 0.37 |
+  | confidence | 0.77 | 0.74 |
+
+  Light editing doesn't fool the system: most of the sentence structure and
+  wording are still the AI's, and signal one still recognizes them. I think
+  labeling it AI is acceptable, since over 80% of it is still AI-written. It
+  does point at a grey area, though: a real user might let AI write a draft
+  and then edit it, and the system treats that as AI. How much editing it
+  takes to cross the line is something unit 8 is likely to probe.
+
 ---
 
 ## Label Variants
