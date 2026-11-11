@@ -1068,22 +1068,143 @@ block survives a restart.
 
 ## Attack Run — Before
 
-<!-- Every attack with its outcome and a held-or-broke mark.
-     `run_attacks.py --label before` produces the table. -->
+Run: `python run_attacks.py --set attack_set`, with the service restarted
+first so the rate-limit counts started at zero. Full output:
+`results/attack_run_2026-11-10_1916.md`. 56 inputs: 32 in `attacks.csv` and 24
+in `attacks_malformed_requests.csv`.
 
+**How I marked held and broke.** An `unsure` result counts as **held**. In unit
+7, I designed unsure to mean "we can't tell, nothing happens". It accuses no
+one and clears no one. So:
 
+- **evasion**: broke only if the AI text was labelled **human**.
+- **false_positive**: broke only if the human text was labelled **ai**.
+- **prompt_injection**: judged by whether the attack got what it was after.
+  PI01–PI03 and PI05 wrap AI-style text, so a **human** label means it got
+  through. PI04 and PI06 wrap real human text, so they're held unless the label
+  is wrong or the response or log is damaged.
+- **malformed**: held if the service refused cleanly with a 4xx and logged it.
+  Broke if it crashed or gave a confident judgment on text it can't read.
+  **Not reached** if the limiter answered before the route ever saw the
+  request.
+- **flood**: held if the limit kicked in.
 
-**Ten audit log entries from the run**
+| ID | Family | Targeting | Status | Guess | Score | Verdict |
+|---|---|---|---|---|---|---|
+| EV01 | evasion | signal two: typos raise word variety | 200 | human | 0.378 | **BROKE** |
+| EV02 | evasion | signal two: broken-up sentences raise length spread | 200 | human | 0.416 | **BROKE** |
+| EV03 | evasion | signal two: a pasted quotation changes the shape | 200 | unsure | 0.560 | HELD |
+| EV04 | evasion | signal one: unusual words raise perplexity | 200 | ai | 0.683 | HELD |
+| EV05 | evasion | both signals: heavy human editing pass | 200 | human | 0.225 | **BROKE** |
+| EV06 | evasion | signal two: one very long sentence and one very short | 200 | human | 0.401 | **BROKE** |
+| EV07 | evasion | signal two: padding with punctuation | 200 | unsure | 0.560 | HELD |
+| EV08 | evasion | signal one: text below the token window | 200 | human | 0.322 | **BROKE** |
+| EV09 | evasion | both: AI text with a human opening paragraph bolted on | 200 | unsure | 0.572 | HELD |
+| EV10 | evasion | signal two: repeated stanza structure | 200 | unsure | 0.640 | HELD |
+| FP01 | false_positive | plain, clear human writing with no flourishes | 200 | unsure | 0.518 | HELD |
+| FP02 | false_positive | human writing in a formal register | 200 | ai | 0.733 | **BROKE** |
+| FP03 | false_positive | a non-native English speaker writing carefully | 200 | ai | 0.727 | **BROKE** |
+| FP04 | false_positive | a student essay written to a rubric | 200 | ai | 0.723 | **BROKE** |
+| FP05 | false_positive | technical documentation written by a person | 200 | ai | 0.754 | **BROKE** |
+| FP06 | false_positive | a person imitating a formal template | 200 | unsure | 0.640 | HELD |
+| FP07 | false_positive | human writing that repeats a phrase deliberately | 200 | unsure | 0.617 | HELD |
+| FP08 | false_positive | very short genuine human submission | 200 | human | 0.326 | HELD |
+| PI01 | prompt_injection | instruction to ignore the check | 200 | human | 0.324 | **BROKE** |
+| PI02 | prompt_injection | instruction disguised as a system message | 200 | human | 0.143 | **BROKE** |
+| PI03 | prompt_injection | instruction wrapped in the writer's voice | 200 | unsure | 0.570 | HELD |
+| PI04 | prompt_injection | attempt to make the label text hostile | 200 | human | 0.472 | HELD — the label is one of my three fixed strings, and the `<script>` never reaches it |
+| PI05 | prompt_injection | attempt to inject into the audit log | 200 | unsure | 0.598 | HELD — the log line is intact; the fake `"guess"` and `"combined_score"` stayed inside `text` and never became fields |
+| PI06 | prompt_injection | instruction plus real human text | 200 | human | 0.483 | HELD — correct label for real human text |
+| MF01 | malformed | text is only whitespace | 400 | — | — | HELD |
+| MF02 | malformed | text is a single character | 400 | — | — | HELD |
+| MF03 | malformed | text is control characters | 400 | — | — | HELD |
+| MF04 | malformed | text is only punctuation | **500** | — | — | **BROKE** — crash, and **no audit entry** |
+| MF05 | malformed | text is a very long single word | 400 | — | — | HELD |
+| MF06 | malformed | text is emoji only | 400 | — | — | HELD |
+| MF07 | malformed | text is right-to-left script | 200 | ai | 0.784 | **BROKE** — a confident AI label on one Arabic sentence |
+| MF08 | malformed | text is 60,000 characters | 400 | — | — | HELD |
+| RQ01 | malformed | no text field at all | 400 | — | — | HELD |
+| RQ02 | malformed | no creator_id | 400 | — | — | HELD |
+| RQ03 | malformed | text is a number | 400 | — | — | HELD |
+| RQ04 | malformed | text is a list | 400 | — | — | HELD |
+| RQ05 | malformed | text is null | 400 | — | — | HELD |
+| RQ06 | malformed | creator_id is an object | 400 | — | — | HELD |
+| RQ07 | malformed | body is a JSON array, not an object | 400 | — | — | HELD |
+| RQ08 | malformed | body is unparseable JSON | 400 | — | — | HELD |
+| RQ09 | malformed | body is empty | 400 | — | — | HELD |
+| RQ10 | malformed | body is form-encoded, not JSON | 429 | — | — | NOT REACHED |
+| RQ11 | malformed | body is JSON claiming to be plain text | 429 | — | — | NOT REACHED |
+| RQ12 | malformed | deeply nested JSON | 400 | — | — | HELD |
+| FL01_01–05 | flood_same_creator | rapid submissions from one creator | 200 ×5 | human | 0.170 | HELD |
+| FL01_06–12 | flood_same_creator | rapid submissions from one creator | 429 ×7 | — | — | HELD |
 
-<!-- Choose entries that show the interesting failures, not the ten easiest. -->
+**Count**
+
+| Family | Attacks | Held | Broke | Not reached |
+|---|---|---|---|---|
+| evasion | 10 | 5 | **5** | 0 |
+| false_positive | 8 | 4 | **4** | 0 |
+| prompt_injection | 6 | 4 | **2** | 0 |
+| malformed | 20 | 16 | **2** | 2 |
+| flood_same_creator | 12 | 12 | 0 | 0 |
+| **Total** | **56** | **41** | **13** | **2** |
+
+**Three things the table alone doesn't show:**
+
+- **MF04 left no trace.** 56 requests produced 55 audit entries. The only
+  request missing from the log is the one that crashed the service. The
+  terminal running `app.py` showed `ZeroDivisionError: float division by zero`
+  at `stylometry.py:72` (`sentence_length_spread`), reached from
+  `app.py:278` (`style_signal`). Because debug mode is on, the caller got back
+  the Werkzeug debugger's HTML page instead of JSON.
+- **RQ10 and RQ11 were never tested.** Neither request has a usable
+  `creator_id`, so both counted against my address (127.0.0.1). Five earlier
+  requests without a `creator_id` (RQ02, RQ06, RQ07, RQ08, RQ09) had already
+  used up that address's 5-per-minute limit. The limiter answered 429 before
+  my route saw either body, so I don't know how `/submit` handles a
+  form-encoded body.
+- **The flood family is 12 rows, not 20.** Its `targets` column says "20 rapid
+  submissions", but the file has 12 rows. All 12 behaved as expected.
+
+**Eleven audit log entries from the run** (`logs/audit.jsonl`, in log order;
+the last two are rejections)
 
 ```json
-
+{"timestamp": "2026-11-11T03:16:53+00:00", "content_id": "66eedf4a-0c53-4a7e-9a21-f03c5162284c", "creator_id": "attacker_EV01", "guess": "human", "model_score": 0.1635, "style_score": 0.8785, "combined_score": 0.378, "label": "We think this was most likely written by a person.", "status": "decided"}
+{"timestamp": "2026-11-11T03:16:54+00:00", "content_id": "2aeea172-19c1-4e24-a883-0aabf37e14ee", "creator_id": "attacker_EV05", "guess": "human", "model_score": 0.3212, "style_score": 0.0, "combined_score": 0.2248, "label": "We think this was most likely written by a person.", "status": "decided"}
+{"timestamp": "2026-11-11T03:16:55+00:00", "content_id": "0f764e37-de12-46f2-b186-f9d99aa91fee", "creator_id": "attacker_FP02", "guess": "ai", "model_score": 0.7387, "style_score": 0.7193, "combined_score": 0.7329, "label": "We think this was most likely written by AI. Nothing happens because of this result. If you think this result is wrong, you can request a review. A person can see things our check can't.", "status": "decided"}
+{"timestamp": "2026-11-11T03:16:56+00:00", "content_id": "5236e5be-bc2c-4832-96ff-e7a601847b02", "creator_id": "attacker_FP03", "guess": "ai", "model_score": 0.8051, "style_score": 0.5436, "combined_score": 0.7267, "label": "We think this was most likely written by AI. Nothing happens because of this result. If you think this result is wrong, you can request a review. A person can see things our check can't.", "status": "decided"}
+{"timestamp": "2026-11-11T03:16:56+00:00", "content_id": "524a0b9f-82ab-486c-a2ae-b3e29813485a", "creator_id": "attacker_FP05", "guess": "ai", "model_score": 0.8005, "style_score": 0.6462, "combined_score": 0.7542, "label": "We think this was most likely written by AI. Nothing happens because of this result. If you think this result is wrong, you can request a review. A person can see things our check can't.", "status": "decided"}
+{"timestamp": "2026-11-11T03:16:56+00:00", "content_id": "7ae14243-cf09-409a-a877-a9988ea962af", "creator_id": "attacker_PI02", "guess": "human", "model_score": 0.2044, "style_score": 0.0, "combined_score": 0.1431, "label": "We think this was most likely written by a person.", "status": "decided"}
+{"timestamp": "2026-11-11T03:16:57+00:00", "content_id": "e92e4285-2fb5-4673-be72-93795b3ee06a", "creator_id": "attacker_PI05", "guess": "unsure", "model_score": 0.6401, "style_score": 0.5, "combined_score": 0.5981, "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.", "status": "decided"}
+{"timestamp": "2026-11-11T03:16:57+00:00", "creator_id": "attacker_MF06", "event": "rejected", "status": "rejected", "reason": "text_too_short", "endpoint": "/submit"}
+{"timestamp": "2026-11-11T03:16:57+00:00", "content_id": "20642aec-8dc4-410c-bfc5-bfa49ae547c9", "creator_id": "attacker_MF07", "guess": "ai", "model_score": 0.9064, "style_score": 0.5, "combined_score": 0.7845, "label": "We think this was most likely written by AI. Nothing happens because of this result. If you think this result is wrong, you can request a review. A person can see things our check can't.", "status": "decided"}
+{"timestamp": "2026-11-11T03:16:57+00:00", "creator_id": null, "event": "rejected", "status": "rejected", "reason": "rate_limited", "limit": "5 per 1 minute"}
+{"timestamp": "2026-11-11T03:16:57+00:00", "creator_id": "attacker_flood", "event": "rejected", "status": "rejected", "reason": "rate_limited", "limit": "5 per 1 minute"}
 ```
+
+Why these: EV01, EV05 and PI02 are AI text labelled human. FP02, FP03 and
+FP05 are real writers labelled AI. MF07 is a confident AI label on a language
+GPT-2 wasn't trained on. PI05 is the log-injection attempt, and its line is
+still a clean, single JSON object. MF06 is a route rejection. The `null`
+rate-limit entry is RQ10: the request that never reached my route, because it
+counted against my address. The `attacker_flood` entry is the first flood
+rejection. MF04 isn't here because there is nothing to paste: the crash wrote
+no entry.
 
 **The single worst outcome** — the one I'd least want to explain to a writer
 whose work got caught by it:
 
+**MF07.** One sentence of Arabic came back labelled AI with a combined score of
+0.784 (`model_score` 0.9064, `style_score` 0.5). That is the most confident
+wrong call in the whole run, on text my system can't actually read. I'd have
+nothing honest to tell that writer. Every other false positive was at least
+measured against the kind of writing the signals were built for. This one
+accuses someone only because of the language they wrote in. On a writing site
+that would happen to every Arabic-speaking writer who submits, not to one
+unlucky piece. The label promises "a person can see things our check can't",
+but the real problem is that the check couldn't see anything here, and it gave
+no sign of that.
 
 
 ---
