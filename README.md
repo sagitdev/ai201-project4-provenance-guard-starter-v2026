@@ -557,16 +557,121 @@ difficulties*).
 
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human |  |  |
-| unsure |  |  |
-| high-confidence AI |  |  |
+| high-confidence human | 0.00 – 0.50 | We think this was most likely written by a person. |
+| unsure | 0.50 – 0.65 | We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective. |
+| high-confidence AI | 0.65 – 1.00 | We think this was most likely written by AI. Nothing happens because of this result. If you think this result is wrong, you can request a review. A person can see things our check can't. |
+
+The text lives in `scoring.py::score_to_label`; the ranges come from
+`config.HUMAN_THRESHOLD` and `config.AI_THRESHOLD` (`scoring.label_ranges()`
+prints them). A score exactly on a line goes to the outer label: 0.50 is
+human, 0.65 is AI. The disagreement cap (0.64) always lands in unsure. All
+three labels were reached through `/submit`: my Changzhi text → human (0.43),
+my cats text → unsure (0.62), the AI reading text → AI (0.80).
+
+### Where the lines are, and why
+
+All final scores so far, at weights 0.7 / 0.3:
+
+| Text | Score | Truth |
+|---|---|---|
+| H5 weakness | 0.24 | mine |
+| H0 Changzhi | 0.43 | mine |
+| H3 music | 0.50 | mine |
+| mixed (round 2) | 0.54 | half mine, half AI |
+| H2 retail | 0.57 | mine |
+| H4 packages | 0.58 | mine |
+| H1 cats | 0.62 | mine |
+| A2 weekend | 0.68 | AI |
+| A3 mom, lightly edited | 0.74 | AI |
+| A3 mom | 0.77 | AI |
+| A1 reading | 0.80 | AI |
+| A0 friendship | 0.88 | AI |
+
+- **AI line stays at 0.65.** My highest piece is 0.62, the lowest AI text
+  0.68, and 0.65 sits in the middle of that gap (0.03 margin each side).
+- **Human line moves from 0.35 to 0.50.** At 0.35 only one of my six pieces
+  was labeled human. But the line can't go high enough to cover them all:
+  my pieces at 0.57 and 0.58 sit right next to the mixed text at 0.54.
+  Criterion 1 wants most of my writing labeled human; criterion 3 wants mixed
+  writing labeled unsure. No single line satisfies both.
+- **I chose to keep mixed writing in unsure.** My own writing landing in
+  unsure is not an accusation — the label says nothing happens because of
+  it. Mixed writing labeled human would mean "let AI write half, then edit"
+  passes as human, and the tool stops catching what it exists to catch.
+  Between 0.45 and 0.50 I took 0.50: one more of my pieces gets recognized as
+  human, and the mixed text is still in unsure.
+- **What it costs:** criterion 1 needs at least 7 of 10 of my pieces labeled
+  human; with this line only 3 of 6 are (H3 sits exactly on 0.50). I expect
+  to miss criterion 1 in unit 8, and I'm not lowering it. The mixed text has
+  only 0.04 of margin and it's a single sample — criterion 3's three mixed
+  pieces may move this line. Most of my own writing will see the unsure
+  label, so that label's wording matters most.
 
 **Why I worded the "unsure" one this way:**
 <!-- It's the hardest of the three. It has to admit uncertainty without
      sounding like an accusation, because the person reading it may well have
      written every word themselves. -->
 
+Because of where I put the human line, unsure is the label my own writing
+gets most often. So it had to put the doubt on the *tool*, not the writer,
+and make clear nothing follows from it.
 
+- *"Our check has its limits"* gives the reason for the uncertainty and
+  places it on our side. It deliberately doesn't say which features caused
+  it: a reader would wonder whether to change how they write, and anyone
+  else would learn how to get around the check.
+- *"Nothing happens because of this result"* — a fact, not a reassurance.
+  Readers trusted it more than anything else in the label.
+- *"Request a review"*, not "appeal": nothing was claimed against them, so
+  there's nothing to appeal against. The AI label uses the same words, so a
+  reader sees one action, not two.
+- No percentage. A number like "62%" means nothing to a writer, and since
+  scores mean "AI-likeness", a human label would show a low number that reads
+  as "we're barely sure you wrote this".
+
+### How the wording changed: three versions, two reader tests
+
+I wrote a first draft (in Chinese) that said *"This is human-written / AI-
+written, system confidence X%"* and promised a result within 24 hours. Four
+problems: it showed a number; it claimed certainty no detector has; the
+unsure label said "not sure whether you used AI tools", which points the
+doubt at the writer; and "24 hours" promised something the system can't do
+— `/appeal` only records the appeal. The review is a person, outside this
+service.
+
+I then tested the labels the way the brief suggests: pasting them into a
+fresh AI chat and asking it to answer *as the writer*, "what is this saying
+about me, and what would I do next?"
+
+| Version | What the "writer" heard | What I changed |
+|---|---|---|
+| **v1** | Unsure read as *"you didn't quite pass"*. *"This isn't a judgement about you"* made it sound like one. *"Some of its features"* made them wonder if their writing was the problem. They wouldn't ask for a review, afraid it could end in the AI label. The AI label's *"especially for writing that is very simple or very regular"* felt like an insult to plain or second-language writers. | Dropped "not a judgement"; replaced the feature hint with "our check has its limits"; added "a review can't make the result worse"; changed the AI label's subject to *our check* ("Our check is sometimes wrong"); "if you wrote it yourself" → "if you think this result is wrong", so someone who used a grammar tool still feels entitled to ask; one term, "request a review". |
+| **v2** | Unsure: *"the problem is their tool, not me"*, and they'd ask for a review without hesitating. But the AI label's *"No action is taken on this result unless a person has reviewed it"* read as *"a review is what triggers action"*, so a writer with any doubt would avoid asking. | Removed that sentence; the AI label now says the same as unsure: *"Nothing happens because of this result."* |
+| **final** | — | My own last edits (below). |
+
+**Choices I made against the test's advice, knowingly:**
+
+- In unsure, I replaced *"A review can't make the result worse"* with *"A
+  review can make the result more objective."* The v2 reader said the old
+  line removed their biggest worry. I preferred to say what a review adds
+  rather than what it can't do; the worry it answered may come back.
+- In the AI label, I replaced the same line with *"A person can see things
+  our check can't"*, and dropped *"Our check is sometimes wrong"* — "most
+  likely" and "if you think this result is wrong" already carry that.
+- I rejected *"a review will give you a satisfying result"*: if the text
+  really is AI-written, the reviewer won't change it, so that's a promise the
+  system can't keep.
+
+**What the labels don't say, and why:**
+
+- **Who can see the label.** Both reader tests named this as their biggest
+  question. The service is only an API — it has no idea of who sees what —
+  so any answer would be a promise the code doesn't keep. Left out on
+  purpose; it belongs to whatever site uses this service.
+- **"Nothing happens because of this result"** (unsure and AI) is a policy
+  assumption, not something the code enforces. It's true of this service —
+  it never hides or removes anything — but if a site ever acts on the
+  labels, this sentence has to change.
 
 ---
 
@@ -574,6 +679,10 @@ difficulties*).
 
 <!-- One submission and one appeal, pasted as text: the request, the response,
      and the log entries. -->
+
+My cats text, written by hand: signal one misreads its plain sentences as
+AI, the style signal disagrees, and it lands in unsure. Then I ask for a
+review.
 
 **A submission**
 
@@ -583,68 +692,168 @@ difficulties*).
      diagnostics. -->
 
 ```bash
-$ curl -X POST http://127.0.0.1:5000/submit \
+$ curl -X POST http://localhost:5000/submit \
   -H "Content-Type: application/json" \
-  -d '{"text": "My hometown is Changzhi, a city in Shanxi Province. It has four distinct seasons and a lot of green space.", "creator_id": "tank"}'
+  -d '{"text": "I have two cats. One is a white cat called Bingbing, another is an orange cat called Lucky. Lucky is older and 8 years old right now. Bingbing is almost 6 years old. They are street cats. When I met Lucky, he was only 2 months old. Bingbing was thrown in an elevator by someone and only 1 month old. I love and really miss them, because they are living with my parents in China now.", "creator_id": "tank"}'
 ```
-
-<!-- Milestone 3 run: signal one only. style_score and label are placeholders
-     until milestones 4 and 5; this gets replaced with the final run. -->
 
 ```json
 {
-  "confidence": 0.6769,
-  "content_id": "d1aa33c3-b470-42e1-abd8-2418b663dc56",
+  "confidence": 0.622,
+  "content_id": "981daedc-db90-425f-b1a8-e529d027f072",
   "guess": "unsure",
-  "label": "PLACEHOLDER",
-  "model_score": 0.6769,
-  "style_score": null
+  "label": "We can't tell how this was written \u2014 our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.",
+  "model_score": 0.7891,
+  "style_score": 0.232
 }
 ```
+
+(`\u2014` is how Flask's JSON writes the dash "—".)
 
 **An appeal**
 
 ```bash
-$ curl -X POST http://127.0.0.1:5000/appeal \
+$ curl -i -X POST http://localhost:5000/appeal \
   -H "Content-Type: application/json" \
-  -d '{"content_id": "...", "reasoning": "..."}'
+  -d '{"content_id": "981daedc-db90-425f-b1a8-e529d027f072", "creator_id": "tank", "reasoning": "I wrote this myself about my two cats. The sentences are short because I write simply in English.", "attestation": true}'
 ```
 
-```json
-
 ```
-
-**What the log shows afterwards**
-
-```bash
-$ curl "http://127.0.0.1:5000/log?limit=3"
+HTTP/1.1 200 OK
+Content-Type: application/json
 ```
 
 ```json
 {
-  "count": 2,
+  "content_id": "981daedc-db90-425f-b1a8-e529d027f072",
+  "message": "We've received your appeal. A person will review it.",
+  "status": "under_review"
+}
+```
+
+**Invalid appeals**, all on the same `content_id`, sent right after:
+
+| Request | Status | `error` |
+|---|---|---|
+| `creator_id: "someone_else"` | 403 | `not_your_content` |
+| `attestation: false` | 400 | `attestation_required` |
+| `content_id: "does-not-exist"` | 404 | `content_not_found` |
+| `reasoning` of 5,001 characters | 400 | `reasoning_too_long` |
+| no `creator_id` | 400 | `creator_id_missing` |
+
+**What the log shows afterwards**
+
+```bash
+$ curl "http://localhost:5000/log?limit=8"
+```
+
+```json
+{
+  "count": 8,
   "entries": [
     {
-      "creator_id": "tank",
-      "event": "rejected",
-      "reason": "text_missing",
-      "status": "rejected",
-      "timestamp": "2026-11-10T04:55:24+00:00"
-    },
-    {
-      "combined_score": 0.6769,
-      "content_id": "d1aa33c3-b470-42e1-abd8-2418b663dc56",
+      "combined_score": 0.622,
+      "content_id": "981daedc-db90-425f-b1a8-e529d027f072",
       "creator_id": "tank",
       "guess": "unsure",
-      "label": "PLACEHOLDER",
-      "model_score": 0.6769,
+      "label": "We can't tell how this was written \u2014 our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.",
+      "model_score": 0.7891,
       "status": "decided",
-      "style_score": null,
-      "timestamp": "2026-11-10T19:41:54+00:00"
+      "style_score": 0.232,
+      "timestamp": "2026-11-11T02:11:16+00:00"
+    },
+    {
+      "combined_score": 0.7989,
+      "content_id": "84881bb9-5539-4f8c-a589-6d7c108cb9f2",
+      "creator_id": "tank",
+      "guess": "ai",
+      "label": "We think this was most likely written by AI. Nothing happens because of this result. If you think this result is wrong, you can request a review. A person can see things our check can't.",
+      "model_score": 0.8224,
+      "status": "decided",
+      "style_score": 0.744,
+      "timestamp": "2026-11-11T02:11:24+00:00"
+    },
+    {
+      "content_id": "981daedc-db90-425f-b1a8-e529d027f072",
+      "creator_id": "tank",
+      "event": "appeal",
+      "reasoning": "I wrote this myself about my two cats. The sentences are short because I write simply in English.",
+      "status": "under_review",
+      "timestamp": "2026-11-11T02:36:32+00:00"
+    },
+    {
+      "creator_id": "someone_else",
+      "endpoint": "/appeal",
+      "event": "rejected",
+      "reason": "not_your_content",
+      "status": "rejected",
+      "timestamp": "2026-11-11T02:36:46+00:00"
+    },
+    {
+      "creator_id": "tank",
+      "endpoint": "/appeal",
+      "event": "rejected",
+      "reason": "attestation_required",
+      "status": "rejected",
+      "timestamp": "2026-11-11T02:37:00+00:00"
+    },
+    {
+      "creator_id": "tank",
+      "endpoint": "/appeal",
+      "event": "rejected",
+      "reason": "content_not_found",
+      "status": "rejected",
+      "timestamp": "2026-11-11T02:37:09+00:00"
+    },
+    {
+      "creator_id": "tank",
+      "endpoint": "/appeal",
+      "event": "rejected",
+      "reason": "reasoning_too_long",
+      "status": "rejected",
+      "timestamp": "2026-11-11T02:37:42+00:00"
+    },
+    {
+      "creator_id": null,
+      "endpoint": "/appeal",
+      "event": "rejected",
+      "reason": "creator_id_missing",
+      "status": "rejected",
+      "timestamp": "2026-11-11T02:37:49+00:00"
     }
   ]
 }
 ```
+
+What to check in it:
+
+- The original `decided` entry for `981daedc…` is unchanged — same score,
+  same label, same timestamp. The appeal didn't overwrite it.
+- Exactly **one** new entry for that `content_id`: `event: "appeal"`,
+  `status: "under_review"`, carrying the reasoning. The item's current status
+  is its latest entry, so it is now under review.
+- The five invalid appeals left only `rejected` entries — none of them
+  produced an `under_review` entry (criterion 4).
+
+### Reading the log: entries written before and after a format change
+
+The log is append-only, so entries written by older code keep their old
+shape. One change matters when reading it:
+
+- **`endpoint` on rejections.** From milestone 5, every `rejected` entry
+  records which route refused it (`/submit` or `/appeal`), because both can
+  return the same error codes (`invalid_json`, `creator_id_missing`). The one
+  rejection written earlier (`text_missing`, 2026-11-10T04:55:24) has no
+  `endpoint` field; it came from `/submit`, the only route that existed then.
+- **`creator_id: null` on rejections.** From the same change, a rejection
+  with no usable `creator_id` (missing, not a string, or over 100
+  characters) records `null`, never a placeholder string. A placeholder like
+  `"unknown"` could be a real writer's id; a real id is always a non-empty
+  string, so `null` can't be mistaken for one. (No rejection in this log was
+  written under the older placeholder rule.)
+- Decisions from milestones 3–4 also show their stage: `style_score: null`
+  (M3, signal one only) and `label: "PLACEHOLDER"` (M3–M4, before the labels
+  existed).
 
 ---
 

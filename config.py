@@ -48,6 +48,14 @@ DETECTOR_MAX_TOKENS = 400
 # Input limits for POST /submit (milestone1.md section 4, criteria.md #5).
 MAX_TEXT_CHARS = 50_000
 MIN_TEXT_WORDS = 5
+# Input limit for POST /appeal's reasoning. The whole reasoning is written to the
+# audit log, so without a cap, repeated huge appeals grow the log without limit.
+# 5,000 characters is roughly 800 words, far more than an explanation needs.
+MAX_REASONING_CHARS = 5_000
+# Input limit for creator_id on /submit and /appeal. The caller writes creator_id
+# themselves, and it goes into every log entry, rejections included. 100 characters
+# covers usernames, a UUID (36) and nearly every real email address.
+MAX_CREATOR_ID_CHARS = 100
 
 
 # ─── Scoring (Milestone 4) ───────────────────────────────────────────────────
@@ -76,7 +84,7 @@ DISAGREEMENT_GAP = 0.5  # how far apart the two signals have to be to count as a
 # getting through. There is no setting that avoids the trade — only settings
 # that decide who pays for it.
 
-HUMAN_THRESHOLD = 0.35
+HUMAN_THRESHOLD = 0.5
 AI_THRESHOLD = 0.65
 
 # ⚠️ One thing that catches people out in Milestone 5. A weighted average can

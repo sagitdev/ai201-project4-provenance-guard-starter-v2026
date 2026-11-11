@@ -238,16 +238,20 @@
 
   `error` is a short fixed code for programs; `message` is one sentence for a
   person. Every rejection is also written to the log with
-  `audit.log_rejection`.
+  `audit.log_rejection`, along with the `endpoint` that refused it. When
+  `creator_id` is missing, not a string, or too long, the rejection logs it as
+  `null` — never a placeholder string like `"unknown"`, which a real writer
+  could choose as their id.
 
   | Input | `error` |
   |---|---|
   | body isn't JSON, or isn't a JSON object | `invalid_json` |
+  | `creator_id` missing, empty, or not a string | `creator_id_missing` |
+  | `creator_id` longer than **100 characters** | `creator_id_too_long` |
   | `text` missing or not a string | `text_missing` |
   | `text` empty or only whitespace | `text_empty` |
-  | `text` under 5 words — checked in `/submit` before the model runs, so a bad request never loads it (criteria.md #5) | `text_too_short` |
   | `text` longer than **50,000 characters** | `text_too_long` |
-  | `creator_id` missing, empty, or not a string | `creator_id_missing` |
+  | `text` under 5 words — checked in `/submit` before the model runs, so a bad request never loads it (criteria.md #5) | `text_too_short` |
 
   Why 50,000 characters (~9,000 words): a poem is about 50–300 words, a short
   piece 500–1,500, a long piece 2,000–10,000. The limit isn't about accuracy —
@@ -256,6 +260,14 @@
   characters because `len(text)` is one line of code. Note: signal one only
   reads the first ~300 words anyway, so a long piece is judged by model on its
   opening.
+
+  Why 100 characters for `creator_id`: the caller writes it, not the service,
+  and it goes into every log entry — rejections included. Without a cap, a
+  request with a one-megabyte `creator_id` and a two-word `text` would be
+  rejected before the model runs, yet still add a megabyte to the log. 100
+  characters fits a username, a UUID (36) and nearly every real email address.
+  A too-long id is logged as `null`, not cut short, because a shortened id
+  could match a different real writer's id.
 
 ### POST /appeal
 
@@ -267,8 +279,13 @@
     - Honest limit: `creator_id` is not authentication. Anyone who knows or
       guesses a writer's id can type it. Real protection needs login, which
       is outside this unit.
+    - Same 100-character limit as `/submit`.
   - `reasoning` (string, required) — every appeal needs a reason; it's what a
     human reviewer reads.
+    - At most **5,000 characters** (~800 words), measured after trimming
+      spaces at the start and end. The whole reasoning is written to the log,
+      so without a cap, repeated huge appeals would grow the log without
+      limit. 5,000 is far more than an explanation needs.
   - `attestation` (boolean, **required, must be `true`**) — the writer ticks
     a box saying *"I confirm this is my own writing."* If it turns out
     otherwise, the site's own rules apply.
@@ -293,13 +310,17 @@
   be read as "you won", when nothing has been decided yet.
 
 - **Response when something is wrong** — same `error` + `message` shape as
-  `/submit`:
+  `/submit`, and logged the same way. Format is checked first (`400`), the log
+  only after (`404`, `403`), in this order:
 
   | Situation | Status | `error` |
   |---|---|---|
   | body isn't a JSON object | `400` | `invalid_json` |
+  | `content_id` missing, empty, or not a string | `400` | `content_id_missing` |
+  | `creator_id` missing, empty, or not a string | `400` | `creator_id_missing` |
+  | `creator_id` longer than **100 characters** | `400` | `creator_id_too_long` |
   | `reasoning` missing or empty | `400` | `reasoning_missing` |
-  | `attestation` missing or not `true` | `400` | `attestation_required` |
-  | `content_id` missing | `400` | `content_id_missing` |
-  | `content_id` doesn't exist in the log (`audit.entries_for` is empty) | `404` | `content_not_found` |
+  | `reasoning` longer than **5,000 characters** | `400` | `reasoning_too_long` |
+  | `attestation` missing or not exactly `true` (the string `"true"` doesn't count) | `400` | `attestation_required` |
+  | `content_id` has no `decided` entry in the log | `404` | `content_not_found` |
   | `creator_id` doesn't match the original submission | `403` | `not_your_content` |

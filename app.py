@@ -39,6 +39,23 @@ import stylometry
 app = Flask(__name__)
 
 
+def usable_creator_id(value):
+    """
+    The creator_id if it's safe to log, otherwise None.
+
+    creator_id 是调用方自己填的，所以写进日志前要检查：必须是非空字符串，并且不超过
+    MAX_CREATOR_ID_CHARS。不合格时返回 None（日志里是 null）：
+    - 不用 "unknown"：用户可以真的把 creator_id 写成 "unknown"。
+    - 不截断：截断后的字符串可能正好是另一个真实用户的 id。
+    /submit、/appeal 和限流都用这一个函数，规则只写一遍。
+    """
+    if not isinstance(value, str) or not value.strip():
+        return None
+    if len(value) > config.MAX_CREATOR_ID_CHARS:
+        return None
+    return value
+
+
 # ── Rate limiting — UNIT 8 ────────────────────────────────────────────────────
 # Off until you turn it on. In unit 8, Milestone 1:
 #
@@ -88,8 +105,8 @@ if config.RATE_LIMITING_ENABLED:
         # looks like your handler crashed when your handler never ran.
         if not isinstance(payload, dict):
             return get_remote_address()
-        creator = payload.get("creator_id")
-        return creator if isinstance(creator, str) and creator.strip() else get_remote_address()
+        # 超长的 creator_id 也退回到按 IP 计数，不拿它当限流的 key 存进内存。
+        return usable_creator_id(payload.get("creator_id")) or get_remote_address()
 
     limiter = Limiter(
         key_func=rate_limit_key,
@@ -109,7 +126,8 @@ if config.RATE_LIMITING_ENABLED:
         if not isinstance(payload, dict):
             payload = {}
         audit.log_rejection(
-            creator_id=payload.get("creator_id", "unknown"),
+            # 和 reject() 一样，不合法或超长的 creator_id 记成 None。
+            creator_id=usable_creator_id(payload.get("creator_id")),
             reason="rate_limited",
             limit=str(exc.description),
         )
@@ -155,14 +173,18 @@ def health():
 
 
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
-def reject(error, message, creator_id="unknown", status=400):
+def reject(error, message, creator_id=None, status=400):
+    # creator_id 默认 None（日志里是 null）：真正的 creator_id 一定是非空字符串，永远不会是 null，
+    # 所以"没填"和"某个用户真叫 unknown"不会混在一起。
     """
     A malformed request is a rejection, not a crash.
 
     The route should never raise an exception on a bad request. That looks like
     a broken service to the caller, and it looks like a broken route to you.
     """
-    audit.log_rejection(creator_id=creator_id, reason=error)
+    # endpoint 记下是哪个路由拒绝的。/submit 和 /appeal 都会出现 invalid_json 这类错误，
+    # 不写的话，Unit 8 读日志时分不清是谁拒绝的。request.path 由 Flask 自动提供，调用的地方不用改。
+    audit.log_rejection(creator_id=creator_id, reason=error, endpoint=request.path)
     return jsonify({
         "error": error,
         "message": message,
@@ -226,6 +248,12 @@ def submit():
     creator_id = payload.get("creator_id")
     if not isinstance(creator_id,str) or not creator_id.strip():
         return reject("creator_id_missing","Please include a creator_id saying who wrote this.")
+    # creator_id 会写进每一条日志，超长时拒绝，并且日志里记成 None（reject 的默认值），不写原文。
+    if len(creator_id) > config.MAX_CREATOR_ID_CHARS:
+        return reject(
+            "creator_id_too_long",
+            f"Please keep your creator_id under {config.MAX_CREATOR_ID_CHARS} characters.",
+        )
 
     text = payload.get("text")
     if not isinstance(text, str): #同时挡住"没有 text"（None）、text: null（None）、text: 123（数字）
@@ -250,8 +278,9 @@ def submit():
     style_score = stylometry.style_signal(text)   
 # 现在坏请求会写日志，但正常请求不会：判定做完就返回了，没留下记录。第 4 步要补上这一条。
 # 为什么重要： 下一步的 /appeal 要用 audit.entries_for(content_id) 去日志里查找这个 content_id。正常请求不写日志的话，所有申诉都会返回 404。
-    guess,label = "unsure","PLACEHOLDER" # milestone 5
-    confidence = scoring.combine_signals(model_score, style_score) # milestone 4
+    confidence = scoring.combine_signals(model_score, style_score)
+    guess,label = scoring.score_to_label(confidence)
+ # milestone 4
     audit.log_decision(
         content_id = content_id,
         creator_id = creator_id,
@@ -292,14 +321,75 @@ def appeal():
     to the person on the other end. It's the only thing standing between a
     wrong accusation and nothing at all.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    # 和 /submit 一样不加 or {}：坏 JSON 得到 None，才能返回准确的 invalid_json。
+    if not isinstance(payload, dict):
+        return reject("invalid_json", "Please send a JSON object with content_id, creator_id, reasoning and attestation.")
 
-    # TODO: delete this and build the route.
+    # 先检查格式（400），再查日志（404 / 403）。格式不对的请求不用去读日志。
+    content_id = payload.get("content_id")
+    creator_id = payload.get("creator_id")
+    reasoning = payload.get("reasoning")
+    attestation = payload.get("attestation")
+
+    # creator_id 先取出来，后面每条拒绝记录都能写上是谁发的。
+    # 不合法或超长时是 None（日志里是 null），规则见 usable_creator_id。
+    who = usable_creator_id(creator_id)
+
+    if not isinstance(content_id, str) or not content_id.strip():
+        return reject("content_id_missing", "Please include the content_id of the result you're appealing.", who)
+    if not isinstance(creator_id, str) or not creator_id.strip():
+        return reject("creator_id_missing", "Please include your creator_id so we know this is your work.")
+    if who is None:
+        # 走到这里说明 creator_id 是非空字符串，只是太长。
+        return reject(
+            "creator_id_too_long",
+            f"Please keep your creator_id under {config.MAX_CREATOR_ID_CHARS} characters.",
+        )
+    if not isinstance(reasoning, str) or not reasoning.strip():
+        return reject("reasoning_missing", "Please tell us why you think this result is wrong.", who)
+    # reasoning 会完整写进日志，不设上限的话，反复发超长申诉会让日志一直变大。
+    # 先 strip 再量长度，和写进日志的内容保持一致。
+    if len(reasoning.strip()) > config.MAX_REASONING_CHARS:
+        return reject(
+            "reasoning_too_long",
+            f"Please keep your reason under {config.MAX_REASONING_CHARS:,} characters.",
+            who,
+        )
+    # 必须是布尔值 True：字符串 "true"、数字 1 都不算。勾选框就是 true / false。
+    if attestation is not True:
+        return reject("attestation_required", "Please confirm this is your own work to submit an appeal.", who)
+
+    content_id = content_id.strip()
+    # 只认 /submit 写下的那条判定记录（status == "decided"）。
+    # 之前的申诉记录也带 content_id，但它不是"原始提交"，不能用来核对作者。
+    decisions = [e for e in audit.entries_for(content_id) if e.get("status") == "decided"]
+    if not decisions:
+        return reject(
+            "content_not_found",
+            "We couldn't find a result with that content_id. Please check it and try again.",
+            who,
+            status=404,
+        )
+
+    original = decisions[0]
+    if original.get("creator_id") != creator_id:
+        return reject(
+            "not_your_content",
+            "You can only appeal results for your own submissions.",
+            who,
+            status=403,
+        )
+
+    # 只追加，不改原来的 decided 记录：日志里能看到"先判定、后被申诉"的顺序。
+    audit.log_appeal(content_id=content_id, creator_id=creator_id, reasoning=reasoning.strip())
+
+    # 用 "received" 而不是 "successful"：还没有人做出决定，不能让写作者以为已经赢了。
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /appeal isn't built yet — see the TODO in app.py.",
-        "you_sent": payload,
-    }), 501
+        "content_id": content_id,
+        "status": "under_review",
+        "message": "We've received your appeal. A person will review it.",
+    })
 
 
 # ── Already works ─────────────────────────────────────────────────────────────
