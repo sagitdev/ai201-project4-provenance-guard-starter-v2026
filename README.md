@@ -39,6 +39,44 @@
 <!-- The path a submission takes, from arriving to the label a reader sees.
      Six or seven steps — this is the trace you wrote in Milestone 1. -->
 
+Provenance Guard is a small backend a writing site could plug into. Text comes
+in; a guess, a score, a plain-English label and a way to appeal go out. The
+path one submission takes through `POST /submit`:
+
+1. **The request arrives.** `app.py::submit` parses the JSON body with
+   `request.get_json(silent=True)`. Invalid JSON becomes `None`, not a crash.
+2. **Validate, before anything expensive.** The request is rejected with a
+   `400` (an `error` code plus a `message`) if the body isn't a JSON object,
+   `creator_id` is missing or over 100 characters, or `text` is missing,
+   empty, under 5 words or over 50,000 characters. Every check runs before the
+   model is touched, and every rejection is written to the log with
+   `audit.log_rejection`. Accepted text gets a `content_id` from
+   `uuid.uuid4()`.
+3. **Signal one — how predictable the text is.** `detector.py::model_signal`
+   runs GPT-2 over the first 400 tokens, measures perplexity, and squashes it
+   onto 0–1: low perplexity → high AI score.
+4. **Signal two — the shape of the text.** `stylometry.py::style_signal`
+   measures how much sentence lengths vary and maps that onto 0–1: even
+   sentences → high AI score. With fewer than 3 sentences it returns a neutral
+   0.5.
+5. **Combine them.** `scoring.py::combine_signals` takes 0.7 × signal one +
+   0.3 × signal two. If the two signals disagree by 0.5 or more, the score is
+   capped just below the AI line, so the text can't be labeled AI.
+6. **Turn the score into words.** `scoring.py::score_to_label`: up to 0.50 →
+   human, 0.50–0.65 → unsure, 0.65 and above → AI, each with a full sentence a
+   writer can read (see *Label Variants*).
+7. **Record it, then answer.** `audit.py::log_decision` appends one line to
+   `logs/audit.jsonl` with all three scores, the guess and the label; the
+   response returns `content_id`, `guess`, `confidence`, `label`,
+   `model_score` and `style_score`.
+
+**The way back: `POST /appeal`.** A writer sends the `content_id`, their
+`creator_id`, a reason and `attestation: true` ("this is my own writing").
+After the format checks, the service confirms the `content_id` exists (`404`
+if not) and belongs to them (`403` if not), then appends an `under_review`
+entry beside the original decision — which is never edited — and confirms
+that a person will review it.
+
 
 
 ---
@@ -53,19 +91,65 @@
 
 ### Signal one — the model signal
 
-**What it measures:**
+**What it measures:** How *predictable* the text is to a language model.
+`detector.py` runs GPT-2 over the first 400 tokens and measures perplexity —
+how surprised the model is by each next word — then squashes it onto 0–1 with
+a logistic curve (perplexity 45 → 0.5). Low perplexity means a high AI score.
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** A language model
+writes by repeatedly picking a likely next word, so text a model produced
+tends to be text a model finds easy to predict. Human writing wanders more:
+odd word choices, abrupt turns, mistakes. My own hand-written English scored
+perplexity 62 (0.37); the AI-translated version of the same content scored 22
+(0.76).
 
-**What it can't see:**
+**What it can't see:** Predictability is not authorship.
+
+- **Plain writers get accused.** Short sentences and common words are easy to
+  predict whoever wrote them: second-language writers, children, step-by-step
+  instructions, formulaic genres. My own cats text scored 0.79 on this signal
+  — almost the AI texts' 0.82. These are the writers with the least room to
+  argue back, and the problem is built into the method, not a fixable bug.
+- **Quoted famous text** is something GPT-2 has seen countless times, so it
+  reads as AI.
+- **AI slips through when it's made less predictable.** Rare words, ornate
+  prose, or a few added typos raise perplexity: my mistakes (*beacause*,
+  *dosen't*) were a big part of why my text read as human, and the same
+  trick works on AI text.
+- It reads only the first 400 tokens, is unstable on short text, is a 2019
+  English model, and says nothing meaningful about other languages.
 
 ### Signal two — the style signal
 
-**What it measures:**
+**What it measures:** The *shape* of the text, without reading a word: how
+much sentence lengths vary — standard deviation ÷ mean of the words per
+sentence (`stylometry.py::sentence_length_spread`). `style_signal` maps it
+onto 0–1 with two anchors: spread ≤ 0.1 → 1.0 (AI-like), ≥ 0.6 → 0.0
+(human-like), a straight line between, and a neutral 0.5 under 3 sentences.
+Type-token ratio and punctuation density are also computed and printed, but
+weighted 0: across ten samples, AI and my writing overlapped completely on
+both (see *Calibration Log*, round 3).
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** "Most likely next
+word" tends to produce even, mid-length sentences. Human writing is lumpier —
+a four-word sentence next to a sixteen-word one. The most even AI text had a
+spread of 0.11 (sentences of 11, 10, 13, 12 words); my cats text had 0.48.
 
-**What it can't see:**
+**What it can't see:** It doesn't understand the content, so anything that
+changes the shape without changing the substance moves it.
+
+- **One keystroke moves it.** A missing space after a full stop (`them.I`)
+  merges two sentences; one of my texts jumped to a spread of 0.98 that way.
+  Splitting or merging a few sentences on purpose is a cheap way to make AI
+  text look human.
+- **Even writers get accused.** Academic or official prose, essays trained to
+  keep "every sentence a moderate length", and instructions all have even
+  sentence lengths. My music text (0.23) tied an AI text exactly.
+- **Few sentences, fragile reading.** With three sentences, changing one
+  moves it a lot: adding one opening sentence to my packages text dropped its
+  spread from 0.47 to 0.21. Under 3 sentences it gives up and returns 0.5.
+- It rests on a single measure, so there is no second style feature to catch
+  what this one misses.
 
 ### The combining rule
 
@@ -859,17 +943,58 @@ shape. One change matters when reading it:
 
 ## How I Used AI
 
-**Moment 1**
+**Moment 1 — the label wording (milestone 5)**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I wrote the three labels myself, in Chinese, and asked
+  Claude to check them. My draft said things like *"This text is AI-written,
+  system confidence X%. You can appeal and we'll check it by hand within 24
+  hours."*
+- *What came back:* Four problems. The percentage would mislead: scores mean
+  AI-likeness, so a human label would show a small number that reads as
+  "we're barely sure you wrote this". "Is AI-written" claims a certainty no
+  detector has. My unsure label ("not sure whether you used AI tools") pointed
+  the doubt at the writer. And "24 hours" was a promise the service can't
+  keep — `/appeal` only records the appeal. It drafted a revised version. I
+  then ran the brief's reader test twice, each time in a fresh AI chat that
+  knew nothing about my system, asking it to answer *as the writer*.
+- *What I changed:* I took the fixes the tests justified: dropped "this isn't
+  a judgement about you", which the first test said made it sound like one;
+  put the cause on "our check" instead of the writer's features; removed "no
+  action is taken unless a person has reviewed it", which the second test
+  read as "asking for a review triggers action". But some decisions went
+  against the advice. I replaced "a review can't make the result worse" with
+  my own "a review can make the result more objective", even though the
+  tester said the old line removed their biggest worry. I dropped "our check
+  is sometimes wrong" from the AI label. I wanted to promise "a review will
+  give you a satisfying result" and was talked out of it, because if the text
+  really is AI-written that promise breaks. And I chose to say nothing about
+  who can see the label, though both tests asked, because the service has no
+  way to keep that promise. The full before-and-after is under *Label
+  Variants*.
 
-**Moment 2**
+**Moment 2 — the "human" sample that wasn't (milestone 4)**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I ran three texts — an AI paragraph, "my own"
+  paragraph about my hometown, and a mixed one — through both signals and
+  asked Claude to analyse the numbers so I could decide the style signal's
+  weights.
+- *What came back:* A confident analysis. Signal one barely separated my
+  writing from the AI's (0.76 vs 0.83), which it read as proof of the
+  second-language blind spot from milestone 1. Punctuation looked like "more
+  punctuation = more human" (0.108 vs 0.065). Type-token ratio pointed the
+  wrong way. All of it followed logically from the data.
+- *What I changed:* The data was wrong, and only I knew it. My "own"
+  paragraph wasn't written in English by me: I wrote it in Chinese and had AI
+  translate it. Every English word was the AI's, so the analysis was comparing
+  AI against AI. I told Claude, wrote the paragraph again entirely by hand in
+  English — mistakes left in — and reran everything. Signal one dropped from
+  0.76 to 0.37, and punctuation flipped direction: my real writing had the
+  *least* punctuation of the three. Had I coded the first conclusion, my own
+  writing would have scored as fully AI-like on that measure. After that I
+  wrote more samples (round 3), and punctuation turned out not to separate
+  the groups at all, so it got weight 0. The lesson I kept: an AI's analysis
+  is only as good as the data it's given, and it can't know where my data
+  came from. Both rounds are recorded in the *Calibration Log*.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
