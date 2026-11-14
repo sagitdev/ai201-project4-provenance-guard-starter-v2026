@@ -996,6 +996,61 @@ shape. One change matters when reading it:
   is only as good as the data it's given, and it can't know where my data
   came from. Both rounds are recorded in the *Calibration Log*.
 
+**Unit 8 — how the work was split**
+
+All of unit 8 was done with Claude Code acting as a tutor. For each
+milestone it explained the task first, and I did the work once I understood
+it. Being specific about who did what:
+
+- **Written by Claude, checked by me:** the two test tools
+  (`run_criteria_4_5.py` for appeals and bad input, `probe_languages.py` for
+  the non-English probes), the arrangement of `scenarios.py`, and the
+  first English drafts of most unit 8 README text, which I then read and
+  corrected. It also ran the commands and restarted the service between
+  trials.
+- **Mine:** the rate-limit numbers, once I'd understood how to reason about
+  them. Every test text in `scenarios.py`, rewritten to fit my own criteria
+  when Claude pointed out they didn't. The rule "unsure counts as held".
+  MF07 as the worst outcome. The verdicts. The choice of improvement. And the
+  trade above.
+
+**Moment 3 — three causes, and finding the fourth myself (unit 8, M2)**
+
+- *What I asked for:* the brief's prompt: give me three possible causes of
+  MF07 at different stages, and don't say which is most likely.
+- *What came back:* the route (no language check), signal one (GPT-2 on
+  Arabic), and the combining rule and label mapping (style's 0.5 used as if
+  it were a reading).
+- *What I did:* I worked out the actual chain myself, at `app.py:269`,
+  `stylometry.py:144` and `scoring.py:57`, and found a cause it hadn't
+  listed. With style at 0.5, the disagreement cap can never fire, so model
+  decides alone, and any model ≥ 0.714 means ai. Claude checked the
+  arithmetic against the code and corrected one figure (0.715 → 0.714). It
+  also pushed back on my claim that "all non-Latin scripts fail the same
+  way", and suggested I test it. The Chinese and Russian probes then showed
+  three *different* failures, one of them a second crash. That diagnosis
+  became my M5 improvement.
+
+**Moment 4 — where I needed it explained, and where it caught my mistakes
+(unit 8, M4–M5)**
+
+- *Where I got stuck:* I didn't understand how to group the failures until
+  Claude worked through one row in full (EV02) and let me do the next group
+  (FP02–05). I couldn't see what the FP texts had in common until it framed
+  GPT-2 as a guess-the-next-word game. I misread `min(score, 0.64)` until I
+  asked why it applied to 0.378 at all. The answer was that the `if` checks
+  the *gap* and `min` changes the *score*, two different numbers.
+- *Where it caught me being generous:* I first called criterion 5 MET, and
+  suggested criterion 2's target might be the problem. Using the brief's
+  "argue the opposite verdict" prompt, Claude argued the other side and named
+  the evidence that would settle it. I changed criterion 5 to MISSED, and
+  kept criterion 2's target as it was.
+- *Where it caught my code:* my first version of the `combine_signals` change
+  set `model_score = 0.5` and carried on to the multiplication. With
+  `style_score = None` that crashes (`0.3 * None`), and it throws away
+  model's reading too. I rewrote it to return early, with model clamped into
+  the unsure band.
+
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
@@ -1736,12 +1791,105 @@ through, and none of them was what this change was for.
 <!-- For each attack still getting through and each criterion still missed:
      what you'd do, and why you stopped. -->
 
+After the improvement, 10 attacks still get through and criteria 1, 2 and 5
+are still missed. They're grouped as in the diagnoses. For each: what I'd
+do, and why I stopped. Almost every fix below has the same reason for
+stopping. The unit allows one change, so that before and after can be
+compared. Most of these fixes also make another result worse, and I can say
+which one.
+
+**E. The disagreement cap only works one way (EV01, EV02, EV06).** *What I'd
+do:* when the gap is ≥ 0.5, clamp the score into the unsure band from
+*both* sides, the same way the M5 change does for "no reading". That's what
+my unit 7 design already says. *Why I stopped:* it's a second change. It also
+has a cost I can name from the M3 scores. My own #10 meeting (model 0.68,
+style 0.00) would go from human to unsure, so criterion 1 would get worse
+(7 → 8 unsure). It's the first thing I'd do next, because it's small, it
+makes the code match the design, and its cost is the "unsure" kind.
+
+**A. Signal two maxes out at "certainly human" (EV02, EV05, EV06, PI01,
+PI02).** *What I'd do:* stop a few very short sentences from sending spread to
+its ceiling. One way is to leave sentences of 1–2 words out of the spread.
+Another is to never let style go below about 0.2. *Why I stopped:* I'd have to
+recalibrate it, and the costs land on my own writing. Three of my pieces are
+labelled human (#5, #8, #10), and two of those (#5 and #10) get there
+*because* style gives them 0.00. The same edge that lets AI text escape is
+what lets my real writing through. Fixing A without a better signal one
+would push my own work back into unsure.
+
+**B. Careful human writing reads as AI to signal one (FP02–FP05).** *What I'd
+do:* this one has no quick fix. Lowering signal one's weight would let more
+AI text through, and criterion 3 is already exactly on the line. A real fix
+needs a different measurement, one that compares a text to careful *human*
+writing in the same register (formal, technical, a rubric essay), not just
+"is it predictable". *Why I stopped:* that's a new signal, not a tweak, and it
+needs data I don't have. Until then, the AI label's wording ("Nothing happens
+because of this result… a person can see things our check can't") is the
+only protection these writers get, and it isn't enough.
+
+**D. Typos fool signal one (EV01).** *What I'd do:* fix the spelling before
+signal one reads the text. *Why I stopped:* that would also "correct" real
+writers' typos. My own pieces are full of them ("beacuse", "help them.I"),
+and they're part of what reads as human. I don't know whether it would help
+more than it hurts, so I'd test it before calling it a fix.
+
+**Criteria 1 and 2 missed (7 unsure; gap 0.203).** *What I'd do:* not move
+the human line. My candidate 3 analysis showed that at 0.58 criterion 1 would
+pass, but AI5, two mixed pieces and four attacks would become human, and
+criterion 3 would go from met to missed. Moving the line only moves the cost
+onto someone else. The real cause is that neither signal separates ordinary
+writing (gaps of 0.22 and 0.16), and only a better signal fixes that. *Why I
+stopped:* same as B.
+
+**Criterion 5 missed, and MF04 gets 200 instead of 400.** *What I'd do:* add
+a route check that counts words the way the signals do (`stylometry.words`),
+not with `text.split()`, and reject with a 400 below `MIN_TEXT_WORDS`. That
+gives MF04 its 400, and the route and signal two would finally agree on what
+a word is. *The cost:* Arabic, Russian and Chinese would all get a 400 too.
+That's more honest than a guess, but it turns away every non-English writer.
+The better version tells them plainly "we can only read English" instead of
+"too short", which is what Chinese gets today. *Why I stopped:* a second
+change, and a decision about non-English writers that needs more than one
+afternoon.
+
+**The cost of my own improvement: short texts can never be human.** Any
+genuine text under 3 sentences is now always unsure. I chose this cost, and I'd
+keep it for now. *What I'd do later:* check whether signal two can say
+something useful with 2 sentences, so the minimum could come down.
+
+**Not tested: RQ10 and RQ11.** Both were stopped by the address-based limit
+in both runs, before the route saw them. *What I'd do:* run them on their own,
+after a restart. *Why I stopped:* I kept the attack run exactly as
+specified, both times, so before and after are comparable. These two need a
+separate run, which I haven't done.
+
+**Smaller things:** debug mode sends Werkzeug's debugger page on a crash, and
+that page must never reach a public host. `config.py` already turns debug off
+when the service isn't on loopback, but the crash showed what it would leak.
+Also, 429 entries in the audit log don't record `endpoint`, but my route's
+400s do.
+
 
 
 **The trade I'd make if this ran for real:**
 
 <!-- Two sentences. Fewer wrong accusations means more AI text getting through.
      Say which way you'd go and WHO PAYS FOR IT. -->
+
+I'd go toward fewer wrong accusations, sending anything uncertain to unsure
+and to a person for review. A real writer called AI loses trust in the site,
+and the attack run shows that lands on the most careful writers: non-native
+speakers, students writing to a rubric, people writing technical documents.
+The cost is paid by honest writers, whose work sits next to AI text that
+slips through, and by the reviewers. In my own test, 7 of my 10 pieces
+landed in unsure, so a reviewer would be reading most real writing, not just
+the hard cases.
+
+One thing I can't answer yet: I'm sending the hard cases to a person, but I
+don't know what a person would look at to tell a careful human writer from AI
+any better than my check does. Until I can say what a reviewer is meant to
+look for, "a person will review it" is a promise I can make but can't yet
+back up.
 
 
 
