@@ -1,0 +1,349 @@
+{
+  "produced_by": "run_criteria_4_5.py::main",
+  "trial": 3,
+  "label": "after",
+  "criterion_5": {
+    "target": "9/9 are 400 with error+message, 0 are 500, 9/9 logged rejected, detector_loaded false after",
+    "summary": {
+      "fresh_start (detector_loaded false before)": true,
+      "returned 400": 9,
+      "400 with both error and message": 9,
+      "returned 500": 0,
+      "returned 429": 0,
+      "new log entries": 9,
+      "new entries with status rejected": 9,
+      "detector_loaded after": false
+    },
+    "requests": [
+      {
+        "case": "no text field",
+        "status": 400,
+        "response": {
+          "error": "text_missing",
+          "message": "Please include the text you'd like us to read."
+        }
+      },
+      {
+        "case": "text is empty string",
+        "status": 400,
+        "response": {
+          "error": "text_empty",
+          "message": "The text is empty. Please paste in your writing."
+        }
+      },
+      {
+        "case": "text is only whitespace",
+        "status": 400,
+        "response": {
+          "error": "text_empty",
+          "message": "The text is empty. Please paste in your writing."
+        }
+      },
+      {
+        "case": "text is null",
+        "status": 400,
+        "response": {
+          "error": "text_missing",
+          "message": "Please include the text you'd like us to read."
+        }
+      },
+      {
+        "case": "text is a number",
+        "status": 400,
+        "response": {
+          "error": "text_missing",
+          "message": "Please include the text you'd like us to read."
+        }
+      },
+      {
+        "case": "fewer than 5 words",
+        "status": 400,
+        "response": {
+          "error": "text_too_short",
+          "message": "Please submit at least a few sentences so we can read it properly."
+        }
+      },
+      {
+        "case": "50,001 characters",
+        "status": 400,
+        "response": {
+          "error": "text_too_long",
+          "message": "Please keep submissions under 50,000 characters."
+        }
+      },
+      {
+        "case": "body is a JSON list",
+        "status": 400,
+        "response": {
+          "error": "invalid_json",
+          "message": "Please send a JSON object with text and creator_id."
+        }
+      },
+      {
+        "case": "no creator_id",
+        "status": 400,
+        "response": {
+          "error": "creator_id_missing",
+          "message": "Please include a creator_id saying who wrote this."
+        }
+      }
+    ],
+    "new_log_entries": [
+      {
+        "creator_id": "c5_t3_notext",
+        "endpoint": "/submit",
+        "event": "rejected",
+        "reason": "text_missing",
+        "status": "rejected",
+        "timestamp": "2026-11-14T02:09:05+00:00"
+      },
+      {
+        "creator_id": "c5_t3_empty",
+        "endpoint": "/submit",
+        "event": "rejected",
+        "reason": "text_empty",
+        "status": "rejected",
+        "timestamp": "2026-11-14T02:09:05+00:00"
+      },
+      {
+        "creator_id": "c5_t3_space",
+        "endpoint": "/submit",
+        "event": "rejected",
+        "reason": "text_empty",
+        "status": "rejected",
+        "timestamp": "2026-11-14T02:09:05+00:00"
+      },
+      {
+        "creator_id": "c5_t3_null",
+        "endpoint": "/submit",
+        "event": "rejected",
+        "reason": "text_missing",
+        "status": "rejected",
+        "timestamp": "2026-11-14T02:09:05+00:00"
+      },
+      {
+        "creator_id": "c5_t3_number",
+        "endpoint": "/submit",
+        "event": "rejected",
+        "reason": "text_missing",
+        "status": "rejected",
+        "timestamp": "2026-11-14T02:09:05+00:00"
+      },
+      {
+        "creator_id": "c5_t3_short",
+        "endpoint": "/submit",
+        "event": "rejected",
+        "reason": "text_too_short",
+        "status": "rejected",
+        "timestamp": "2026-11-14T02:09:05+00:00"
+      },
+      {
+        "creator_id": "c5_t3_huge",
+        "endpoint": "/submit",
+        "event": "rejected",
+        "reason": "text_too_long",
+        "status": "rejected",
+        "timestamp": "2026-11-14T02:09:05+00:00"
+      },
+      {
+        "creator_id": null,
+        "endpoint": "/submit",
+        "event": "rejected",
+        "reason": "invalid_json",
+        "status": "rejected",
+        "timestamp": "2026-11-14T02:09:05+00:00"
+      },
+      {
+        "creator_id": null,
+        "endpoint": "/submit",
+        "event": "rejected",
+        "reason": "creator_id_missing",
+        "status": "rejected",
+        "timestamp": "2026-11-14T02:09:05+00:00"
+      }
+    ]
+  },
+  "criterion_4": {
+    "target": "5/5 valid appeals pass all four checks; 3 invalid return 403/400/404 and add 0 under_review entries",
+    "summary": {
+      "submissions that returned 200": 5,
+      "valid appeals: 200 + under_review": 5,
+      "valid appeals: exactly one new under_review entry": 5,
+      "valid appeals: entry carries the reasoning": 5,
+      "valid appeals: original decided entry unchanged": 5,
+      "invalid appeals: got the expected status": 3,
+      "invalid appeals: under_review entries added": 0
+    },
+    "submitted": [
+      {
+        "creator_id": "c4_t3_writer1",
+        "status": 200,
+        "content_id": "e82a6161-d8c5-4636-b431-15e0ae7e055a"
+      },
+      {
+        "creator_id": "c4_t3_writer2",
+        "status": 200,
+        "content_id": "a564f291-af1d-4c06-89c3-d7cd9757ef08"
+      },
+      {
+        "creator_id": "c4_t3_writer3",
+        "status": 200,
+        "content_id": "16047f25-6d1a-46ba-927a-683bed77d385"
+      },
+      {
+        "creator_id": "c4_t3_writer4",
+        "status": 200,
+        "content_id": "31b2c057-5e3f-4745-957f-5a099102e6f0"
+      },
+      {
+        "creator_id": "c4_t3_writer5",
+        "status": 200,
+        "content_id": "47e37f0d-fe9f-497c-abf1-d12ad46ec349"
+      }
+    ],
+    "valid_appeals": [
+      {
+        "content_id": "e82a6161-d8c5-4636-b431-15e0ae7e055a",
+        "reasoning": "I wrote this myself (c4_t3_writer1, trial 3).",
+        "status": 200,
+        "response": {
+          "content_id": "e82a6161-d8c5-4636-b431-15e0ae7e055a",
+          "message": "We've received your appeal. A person will review it.",
+          "status": "under_review"
+        }
+      },
+      {
+        "content_id": "a564f291-af1d-4c06-89c3-d7cd9757ef08",
+        "reasoning": "I wrote this myself (c4_t3_writer2, trial 3).",
+        "status": 200,
+        "response": {
+          "content_id": "a564f291-af1d-4c06-89c3-d7cd9757ef08",
+          "message": "We've received your appeal. A person will review it.",
+          "status": "under_review"
+        }
+      },
+      {
+        "content_id": "16047f25-6d1a-46ba-927a-683bed77d385",
+        "reasoning": "I wrote this myself (c4_t3_writer3, trial 3).",
+        "status": 200,
+        "response": {
+          "content_id": "16047f25-6d1a-46ba-927a-683bed77d385",
+          "message": "We've received your appeal. A person will review it.",
+          "status": "under_review"
+        }
+      },
+      {
+        "content_id": "31b2c057-5e3f-4745-957f-5a099102e6f0",
+        "reasoning": "I wrote this myself (c4_t3_writer4, trial 3).",
+        "status": 200,
+        "response": {
+          "content_id": "31b2c057-5e3f-4745-957f-5a099102e6f0",
+          "message": "We've received your appeal. A person will review it.",
+          "status": "under_review"
+        }
+      },
+      {
+        "content_id": "47e37f0d-fe9f-497c-abf1-d12ad46ec349",
+        "reasoning": "I wrote this myself (c4_t3_writer5, trial 3).",
+        "status": 200,
+        "response": {
+          "content_id": "47e37f0d-fe9f-497c-abf1-d12ad46ec349",
+          "message": "We've received your appeal. A person will review it.",
+          "status": "under_review"
+        }
+      }
+    ],
+    "per_appeal_checks": [
+      {
+        "content_id": "e82a6161-d8c5-4636-b431-15e0ae7e055a",
+        "200 and under_review": true,
+        "exactly one new under_review entry": true,
+        "entry carries the reasoning": true,
+        "original decided entry unchanged": true
+      },
+      {
+        "content_id": "a564f291-af1d-4c06-89c3-d7cd9757ef08",
+        "200 and under_review": true,
+        "exactly one new under_review entry": true,
+        "entry carries the reasoning": true,
+        "original decided entry unchanged": true
+      },
+      {
+        "content_id": "16047f25-6d1a-46ba-927a-683bed77d385",
+        "200 and under_review": true,
+        "exactly one new under_review entry": true,
+        "entry carries the reasoning": true,
+        "original decided entry unchanged": true
+      },
+      {
+        "content_id": "31b2c057-5e3f-4745-957f-5a099102e6f0",
+        "200 and under_review": true,
+        "exactly one new under_review entry": true,
+        "entry carries the reasoning": true,
+        "original decided entry unchanged": true
+      },
+      {
+        "content_id": "47e37f0d-fe9f-497c-abf1-d12ad46ec349",
+        "200 and under_review": true,
+        "exactly one new under_review entry": true,
+        "entry carries the reasoning": true,
+        "original decided entry unchanged": true
+      }
+    ],
+    "invalid_appeals": [
+      {
+        "case": "wrong creator_id",
+        "expected": 403,
+        "status": 403,
+        "response": {
+          "error": "not_your_content",
+          "message": "You can only appeal results for your own submissions."
+        }
+      },
+      {
+        "case": "attestation false",
+        "expected": 400,
+        "status": 400,
+        "response": {
+          "error": "attestation_required",
+          "message": "Please confirm this is your own work to submit an appeal."
+        }
+      },
+      {
+        "case": "nonexistent content_id",
+        "expected": 404,
+        "status": 404,
+        "response": {
+          "error": "content_not_found",
+          "message": "We couldn't find a result with that content_id. Please check it and try again."
+        }
+      }
+    ],
+    "log_entries_added_by_invalid": [
+      {
+        "creator_id": "c4_t3_someone_else",
+        "endpoint": "/appeal",
+        "event": "rejected",
+        "reason": "not_your_content",
+        "status": "rejected",
+        "timestamp": "2026-11-14T02:09:12+00:00"
+      },
+      {
+        "creator_id": "c4_t3_writer2",
+        "endpoint": "/appeal",
+        "event": "rejected",
+        "reason": "attestation_required",
+        "status": "rejected",
+        "timestamp": "2026-11-14T02:09:12+00:00"
+      },
+      {
+        "creator_id": "c4_t3_writer1",
+        "endpoint": "/appeal",
+        "event": "rejected",
+        "reason": "content_not_found",
+        "status": "rejected",
+        "timestamp": "2026-11-14T02:09:12+00:00"
+      }
+    ]
+  }
+}

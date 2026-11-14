@@ -1611,20 +1611,121 @@ set up, not a result, and fixing it means running these two on their own.
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** one rule. *When signal two can't read the text, it says
+so, and the result is unsure.* The rule needs two halves in two files, and
+nothing else moved: no weights, thresholds, labels or route checks.
 
-**Which diagnosis pointed at it:**
+- `stylometry.py::style_signal` returns `None` ("no reading") instead of
+  inventing a number. It does this in two cases. When there are fewer than 3
+  sentences, it used to return 0.5. When no sentence has a word that
+  `words()` can count, it used to crash with `ZeroDivisionError` in
+  `sentence_length_spread`.
+- `scoring.py::combine_signals` handles `None`, which nothing did before. With
+  only one reading available, model isn't allowed to decide alone. Its score
+  is clamped into the unsure band, between `HUMAN_THRESHOLD + 0.01` (0.51) and
+  `AI_THRESHOLD − 0.01` (0.64). So the label is always unsure, but the logged
+  `combined_score` still shows which way model leaned. When style *can* read,
+  the code path is the same as before, line for line.
+- `app.py` is unchanged. `None` reaches the response and the audit log as
+  `"style_score": null`, so an entry shows that style had nothing to measure.
+
+**Which diagnosis pointed at it:** groups **C** and **F**, and pattern 2 ("my
+system can't say *I couldn't read this*"). It aims at my chosen worst outcome,
+MF07, and at the only crash, which is the reason criterion 5 missed and the
+only failure that left no audit entry. Two other candidates and their
+predicted costs are in `notes_unit8.md`: making the disagreement cap work both
+ways, and raising the human line. I chose this one because its cost is more
+*unsure*, not more wrong *ai* labels. In unit 7 I decided that was the cheaper
+side.
 
 ### Attack Run — After
 
-<!-- Same format. `run_attacks.py --label after` -->
+Run: `python run_attacks.py --set attack_set --label after`, after a fresh
+restart, on 2026-11-13 local time (the log's UTC timestamps read
+2026-11-14). Full output: `results/attack_run_2026-11-13_1807_after.md`.
+I used the same marking rules as **Attack Run — Before**. Only 10 of 56
+results changed, and every other row came back identical, score included:
 
+| ID | Family | Before | After | Before verdict | After verdict |
+|---|---|---|---|---|---|
+| MF04 | malformed (only punctuation) | **500**, no log entry | 200 unsure 0.510 (model 0.0112, style `null`), logged | BROKE | **HELD**, see note |
+| MF07 | malformed (Arabic) | ai 0.784 | unsure 0.640 (model 0.9064, style `null`) | BROKE | **HELD** |
+| EV08 | evasion (short text) | human 0.322 | unsure 0.510 (model 0.2452, style `null`) | BROKE | **HELD** |
+| EV07 | evasion (punctuation padding) | unsure 0.560 | unsure 0.586 | HELD | HELD |
+| PI05 | prompt injection (log) | unsure 0.598 | unsure 0.640 | HELD | HELD |
+| FL01_01–05 | flood | human 0.170 ×5 | unsure 0.510 ×5 | HELD | HELD (the limit still kicked in after 5) |
 
+| Family | Broke before | Broke after |
+|---|---|---|
+| evasion | 5 | **4** (EV01, EV02, EV05, EV06) |
+| false_positive | 4 | 4 (FP02–FP05) |
+| prompt_injection | 2 | 2 (PI01, PI02) |
+| malformed | 2 | **0** |
+| flood | 0 | 0 |
+| **Total** | **13** of 56 | **10** of 56 (held 44, not reached 2) |
+
+**Audit log:** the before run wrote 55 entries for 56 requests, because MF04
+left none. The after run wrote **56 for 56**. MF04's entry now exists:
+
+```json
+{"timestamp": "2026-11-14T02:07:38+00:00", "content_id": "58b1882b-aca8-4dec-a938-c070c27603e0", "creator_id": "attacker_MF04", "guess": "unsure", "model_score": 0.0112, "style_score": null, "combined_score": 0.51, "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.", "status": "decided"}
+```
+
+*Note on MF04:* text that is only punctuation now gets a 200 and an unsure
+label. It no longer crashes, and it's logged. But the right answer is a 400
+from the route before any signal sees it. I'm marking it held because nothing
+crashed and nothing was judged with confidence. It still isn't the ideal
+response, and it's listed under **What's Still Broken**.
+
+**Probes after the change:** I didn't re-run them, because the attack set
+was the measurement. Offline, `style_signal` returns `None` for the
+three-sentence Russian text, so `probe_ru3` would no longer crash.
+
+**My five criteria, after** (`python run_eval.py --label after`, and
+`python run_criteria_4_5.py --trial N --label after` for N = 1, 2, 3, with a
+restart before each trial):
+
+| Criterion | Target | Before (×3) | After, run 1 | Run 2 | Run 3 | After verdict |
+|---|---|---|---|---|---|---|
+| 1. My own writing is not called AI | 0 ai **and** ≤ 3 unsure | 0 ai · 7 unsure · 3 human | 0 · 7 · 3 | 0 · 7 · 3 | 0 · 7 · 3 | **MISSED** (unchanged) |
+| 2. AI and my writing score far apart | gap ≥ 0.30 | 0.203 | 0.203 | 0.203 | 0.203 | **MISSED** (unchanged) |
+| 3. Labels reachable, ordinary AI caught | ≥ 3/5 ai **and** ≥ 2/3 mixed unsure | 3/5 · 2/3 | 3/5 · 2/3 | 3/5 · 2/3 | 3/5 · 2/3 | MET (unchanged) |
+| 4. Appeals recorded, invalid ones change nothing | 5/5 · 3/3 · 0 added | 5/5 · 3/3 · 0 | 5/5 · 3/3 · 0 | 5/5 · 3/3 · 0 | 5/5 · 3/3 · 0 | MET (unchanged) |
+| 5. Bad input gets a clear 400, never crashes | 9/9 · 0 × 500 · 9/9 logged · not loaded | met on my nine; MF04 crashed | 9/9 · 0 · 9/9 · not loaded | same | same | **MISSED**, see below |
+
+All 23 submissions for criteria 1–3 scored **identically before and after**,
+to the fourth decimal place, in every trial. Each one has at least 3
+sentences, so the change never touches them. That's evidence that the change
+did what I scoped it to do and nothing else. Results:
+`results/run_2026-11-13_1809_after.md` and
+`results/criteria45_after_trial{1,2,3}_*.json`.
+
+*Criterion 5 after:* the crash is gone. MF04 and three-sentence Russian no
+longer return a 500. But the criterion says bad input gets a **clear 400**,
+and MF04 now gets a 200 and an unsure label. So I'm keeping it MISSED. The
+change moved it from "crashes" to "answers, but with the wrong kind of
+answer". That is a real improvement, and it still isn't the target.
 
 **Did it help, and how do I know:**
 
-<!-- Widening the unsure band usually fixes one problem and creates another.
-     Reporting that trade honestly is worth full credit. -->
+**Yes, for what it targeted, and it cost something.** Broken attacks went
+from 13 to 10. The only crash and the only missing log entry are gone. My
+worst outcome, a confident ai label on a sentence of Arabic, is now unsure. I
+know the change caused this because exactly the rows with fewer than 3
+sentences or no countable words changed, and nothing else did.
+
+**What it cost:** every genuine text under 3 sentences can now **never** be
+labelled human. The five flood submissions (FL01) were labelled human before
+and are unsure now, and so would be any real writer who submits a short
+paragraph. I traded wrong *ai* and *human* labels on short text for no verdict
+at all. In unit 7 I decided unsure is the cheaper mistake, because it accuses
+no one. But it isn't free. A writer whose every short piece says "we can't
+tell" is still being told the check doesn't believe them.
+
+**What it didn't touch, as expected:** criteria 1 and 2 are still missed, with
+exactly the same numbers, because they come from groups B and E and from
+where the human line sits, not from signal two's edges. Ten attacks still get
+through, and none of them was what this change was for.
 
 
 

@@ -141,8 +141,11 @@ def style_signal(text: str) -> float:
     to signal one, and it is plain writing that gets accused.
     """
     # TODO: replace this
-    if len(sentences(text)) < 3:  # 少于三句话时，返回 0.5，后面在 scoring.combine_signals 里决定怎么处理
-        return 0.5
+    if len(sentences(text)) < 3:  # 原来是少于三句话时，return 0.5, 在M5时决定调整，笔记中选择的修复方案2
+        return None
+    length = [len(words(s)) for s in sentences(text)]
+    if sum(length) == 0: # 新增：一个能数的词都没有
+        return None      # 不再往下走到除以零
     # Only spread is used. TTR and punctuation overlapped between AI and my own
     # writing in round 3 (see README Calibration Log), so they get weight 0.
     spread = sentence_length_spread(text)

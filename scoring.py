@@ -53,12 +53,22 @@ def combine_signals(model_score: float, style_score: float) -> float:
     write a different rule.
     """
     # TODO: replace this
+    # M5进行的修复，笔记中选择的修复方案2：style 读不了（返回 None）：只有 model 一个信号，不能让它一个人说了算。
+    # style 读不了（返回 None）：只有 model 一个信号，不能让它一个人说了算。
+    # 把 model 的分数夹在 unsure 区间里（0.51 到 0.64），
+    # 标签一定是 unsure，但日志里还能看出 model 原来偏向哪边。
+    if style_score is None:
+        low = config.HUMAN_THRESHOLD + 0.01 # 0.51，刚好高于 human 线
+        high = config.AI_THRESHOLD - 0.01   # 0.64，刚好低于 ai 线
+        return round(min(max(model_score, low), high), 4)
+
     score = config.WEIGHT_MODEL_SIGNAL * model_score + config.WEIGHT_STYLE_SIGNAL * style_score
     if abs(model_score - style_score) >= config.DISAGREEMENT_GAP:
         score = min(score, config.AI_THRESHOLD - 0.01)
     return (
         round(score, 4)
     )
+
 
 
 def score_to_label(score: float) -> tuple[str, str]:
