@@ -1266,11 +1266,49 @@ Run Log and Verdicts.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. My own writing is not called AI | 0 of 10 ai **and** ≤ 3 unsure | 0 ai · **7 unsure** · 3 human | 0 ai · **7 unsure** · 3 human | 0 ai · **7 unsure** · 3 human | *(M4)* |
-| 2. AI and my writing score far apart | AI avg − my avg ≥ 0.30 | 0.6647 − 0.4618 = **0.203** | **0.203** | **0.203** | *(M4)* |
-| 3. Labels reachable, ordinary AI caught | ≥ 3 of 5 AI essays ai **and** ≥ 2 of 3 mixed unsure | AI 3/5 · mixed unsure 2/3 | 3/5 · 2/3 | 3/5 · 2/3 | *(M4)* |
-| 4. Appeals always recorded, invalid ones change nothing | 5/5 valid pass all checks · 3/3 invalid get 403/400/404 · 0 under_review added | 5/5 · 3/3 · 0 | 5/5 · 3/3 · 0 | 5/5 · 3/3 · 0 | *(M4)* |
-| 5. Bad input gets a clear 400, never crashes | 9/9 400 with error+message · 0 500 · 9/9 logged rejected · detector not loaded | 9/9 · 0 · 9/9 · not loaded | 9/9 · 0 · 9/9 · not loaded | 9/9 · 0 · 9/9 · not loaded | *(M4)* |
+| 1. My own writing is not called AI | 0 of 10 ai **and** ≤ 3 unsure | 0 ai · **7 unsure** · 3 human | 0 ai · **7 unsure** · 3 human | 0 ai · **7 unsure** · 3 human | **MISSED** |
+| 2. AI and my writing score far apart | AI avg − my avg ≥ 0.30 | 0.6647 − 0.4618 = **0.203** | **0.203** | **0.203** | **MISSED** |
+| 3. Labels reachable, ordinary AI caught | ≥ 3 of 5 AI essays ai **and** ≥ 2 of 3 mixed unsure | AI 3/5 · mixed unsure 2/3 | 3/5 · 2/3 | 3/5 · 2/3 | MET |
+| 4. Appeals always recorded, invalid ones change nothing | 5/5 valid pass all checks · 3/3 invalid get 403/400/404 · 0 under_review added | 5/5 · 3/3 · 0 | 5/5 · 3/3 · 0 | 5/5 · 3/3 · 0 | MET |
+| 5. Bad input gets a clear 400, never crashes | 9/9 400 with error+message · 0 500 · 9/9 logged rejected · detector not loaded | 9/9 · 0 · 9/9 · not loaded | 9/9 · 0 · 9/9 · not loaded | 9/9 · 0 · 9/9 · not loaded | **MISSED** |
+
+**How I decided each verdict.** A target has to hold in every trial, and in
+every part of it.
+
+1. **MISSED.** The target has two parts. "0 labelled ai" was met in all three
+   trials. "At most 3 unsure" was missed in all three: 7 were unsure every
+   time. Both parts have to hold.
+2. **MISSED.** The gap was 0.203 in every trial, below 0.30. One finding,
+   recorded here and not as a revision: the reason I gave for 0.30 in
+   criteria.md was "the width of the unsure band (0.35–0.65)". I wrote that
+   before Milestone 5 of unit 7 moved the thresholds to 0.50 and 0.65, so the
+   band is now only 0.15 wide. I am **not** lowering the target to match. The
+   criterion was always measurable, and I would only be changing it because I
+   saw 0.203. That is the kind of revision that doesn't count.
+3. **MET**, with both parts exactly on the line: 3 of 5 AI essays labelled ai
+   and 2 of 3 mixed pieces unsure, in every trial. The identical trials show
+   the result is stable. They don't show it would hold for a different set of
+   essays. With 5 essays, the two that missed (AI4 at 0.582 and AI5 at 0.518)
+   are enough to show one different essay could flip it to 2 of 5. This
+   shows *these five* were caught. It doesn't show ordinary AI text is caught
+   in general.
+4. **MET.** All four checks passed for all 5 valid appeals in every trial.
+   All 3 invalid appeals got the expected 403, 400 and 404, and none added an
+   `under_review` entry. One change in **method**, not target: criteria.md says
+   "tested by hand with `curl`", but I used `run_criteria_4_5.py`. The script
+   checks more than I would by hand. It compares each original `decided` entry
+   before and after the appeal.
+5. **MISSED.** The nine requests I listed passed in all three trials (9 of 9
+   returned 400, none returned 500, all 9 were logged, and the model was never
+   loaded). But the criterion is "never crashes the service", and my own reason
+   for it says "a crash on bad input has no grey area". The attack set found
+   bad input that does crash it. MF04 (text that is only punctuation) returned
+   a 500, and so did my three-sentence Russian probe. Neither crash was logged.
+   My nine requests were a sample for testing that promise, and the attack set
+   found a counter-example outside the sample. Judging by my own list alone
+   would be the generous reading. I haven't changed the criterion. The cases it
+   missed are diagnosed below, and making it stricter is listed as the
+   criterion I'd tighten.
 
 **All three trials were identical** for every text, down to the fourth
 decimal place. Neither signal is random, so this is what a stable pipeline
@@ -1379,6 +1417,193 @@ invalid ones.
                         signal at 0.6, so it dragged the whole score down."
 
      Look for a pattern. Five failures on one signal is one problem, not five. -->
+
+The 13 broken attacks come from six mechanisms, not thirteen. Two attacks
+have causes at two stages, so they appear in two groups. Spreads and word
+counts below were measured with my own `stylometry.sentences`, `words` and
+`sentence_length_spread`, on the exact attack texts.
+
+**A. Signal two: big sentence-length swings read as fully human (EV02, EV05,
+EV06, PI01, PI02).** Signal two turns the spread of sentence lengths into a
+score, `(0.6 − spread) / 0.5`, clamped to 0–1. Any spread at or above 0.6
+becomes 0.00, the most human value it can give. All five attacks get there by
+adding very short sentences next to normal ones. EV02 alternates one-word
+sentences with normal ones (lengths 11, 1, 15, 1, 10, 1, …, spread 0.849).
+EV06 puts a 51-word sentence next to a 1-word one (spread 1.186). EV05 has a
+1-word sentence (0.675). The injected instructions in PI01 and PI02 add short
+sentences at the edges (0.663, 0.652). So the instruction worked as a *shape*
+change, not as an instruction: neither signal reads meaning. With style at
+0.00, the combined score is just 0.7 × model. A model reading of up to 0.71
+then comes out at or below 0.50, which is human. EV02's model reading (0.59)
+would have been unsure on its own, and style dragged it to 0.416.
+*Mechanism: a few one-word sentences are enough to max out spread, and the
+clamp turns that into total certainty of "human".*
+
+**B. Signal one: careful, conventional human writing is predictable (FP02,
+FP03, FP04, FP05).** All four were written by people and labelled ai. Model
+was 0.74–0.83 for all four, while style varied (0.47–0.72). A formal register,
+a non-native speaker writing carefully, a student writing to a rubric and
+technical documentation have one thing in common. The writer reaches for the
+common, safe, expected word. Signal one measures how well GPT-2 predicts the
+next word, so it reads that care as machine-made. At weight 0.7, model alone
+pushes the score past 0.65. The two signals never differed by 0.5, so the
+disagreement cap didn't apply. *Mechanism: signal one can't tell "predictable
+because a model wrote it" from "predictable because a person wrote carefully".
+The writers most at risk are the ones following the rules.*
+
+**C. Signal two abstains, so signal one decides alone (EV08, MF07).** Signal
+two returns 0.5 for any text under 3 sentences (`stylometry.py:144`). The
+comment on that line says `scoring.combine_signals` handles that case, but it
+doesn't. The disagreement cap needs a gap of at least 0.5. With style at 0.5,
+model would have to be exactly 0.0 or 1.0 to reach it, so the cap can't fire.
+The label then depends on model alone. Model ≥ 0.714 gives ai, and model
+≤ 0.50 gives human. EV08 (2 sentences, AI text) got model 0.25, so it was
+labelled human. MF07 (1 Arabic sentence, a human writer) got model 0.91,
+labelled ai at 0.784. The `probe_ru1` Russian sentence repeats this at 0.817.
+For MF07 there is also an upstream cause at the route. `text.split()` counts
+17 words, so it passes `MIN_TEXT_WORDS = 5`, and nothing checks that the text
+is in a language GPT-2 can read. *Mechanism: a fallback value that looks
+neutral hands the whole decision to the less reliable signal, with nothing to
+check it.*
+
+**D. Signal one: typos make AI text unpredictable (EV01).** Misspelled words
+are tokens GPT-2 rarely sees, so it predicts them badly and reads the text as
+human (model 0.16). Signal two got this one right. Spread was only 0.161, so
+style was 0.88, AI-like. But style is weighted 0.3, and group E explains why
+the disagreement didn't help. *Mechanism: typos lower predictability, and
+predictability is all signal one measures.*
+
+**E. Combining rule: the disagreement cap only works in one direction (EV01,
+EV02, EV06).** In unit 7 I decided that "when the two signals disagree, the
+answer should be unsure". This README also says the cap "always lands in
+unsure". The code doesn't do that.
+`score = min(score, AI_THRESHOLD − 0.01)` can only lower a score. A split
+that leans ai is pulled down into unsure. A split that leans human stays
+human, because `min(0.378, 0.64)` is still 0.378. These three attacks all had
+gaps ≥ 0.5 (0.72, 0.59, 0.57), so they were exactly the splits the rule
+exists for, and all three were labelled human. If the rule did what I
+designed, all three would be unsure, which counts as held. *Mechanism: the cap
+I built to protect writers from wrong accusations was never built to stop AI
+text getting through, though my design says it should do both.*
+
+**F. Signal two crashes when no sentence contains a word it can count (MF04,
+and `probe_ru3`).** `words()` only matches `[a-z0-9']+`. Text that is only
+punctuation (`!!! ??? ... ,,, ;;; --- ((( )))`) splits into 4 "sentences" of 0
+words each. Three Russian sentences give 3 sentences of 0 words each, because
+Cyrillic letters aren't in `a-z`. The `len(lengths) < 2` guard only checks how
+many sentences there are, not how many words, so it lets `[0, 0, 0, 0]`
+through. `statistics.mean` is 0, and dividing by it raises `ZeroDivisionError`
+at `stylometry.py:72`. Flask turns that into a 500 HTML page. The route counted
+these texts differently: `text.split()` found 8 and 42 words, so both passed
+`MIN_TEXT_WORDS`. *The route and signal two disagree about what a word is.*
+Because the exception escapes before `audit.log_decision`, **the crash leaves
+no audit entry**. Of the 56 attack requests, this is the only one missing from
+the log.
+
+**Criterion 1 missed (7 unsure, target ≤ 3): three causes, not one.** None
+of my ten pieces was labelled ai, so the expensive mistake didn't happen. The
+miss is that seven landed just above the human line:
+
+| Piece | Model | Style | Combined | What pushed it up |
+|---|---|---|---|---|
+| #1 cats | **0.79** | 0.23 | 0.622 | model: same as group B. Plain, everyday words are easy to predict. This is my "plain" hard case, doing what I predicted |
+| #9 sorry | **0.62** | 0.29 | 0.522 | model: same as group B. A polite apology email is built from formula phrases |
+| #3 music | 0.40 | **0.74** | 0.502 | style: sentence lengths 12, 13, 13, 8, 14, 17 are even, and signal two reads evenness as AI |
+| #4 packages | 0.49 | **0.77** | 0.574 | style: three long sentences of similar length (19, 23, 29) |
+| #2 retail | 0.58 | 0.56 | 0.574 | neither: both signals near the middle |
+| #6 library | 0.54 | 0.50 | 0.529 | neither |
+| #7 repo | 0.57 | 0.53 | 0.558 | neither: my "uniform formal" hard case |
+
+Two things this table shows:
+
+- **My hard cases were not the main problem.** Of the three, #8 (formulaic)
+  was labelled human, #1 (plain) failed the way I predicted, and #7 (uniform
+  formal) sat in the middle. Five of the seven unsure pieces are in my normal
+  style.
+- **The scores sit just over the line, not far from it.** All seven are
+  between 0.502 and 0.622, and #3 misses the human label by 0.002. Each signal
+  on its own gives ordinary writing a reading near 0.5, meaning "can't tell",
+  so their weighted average lands near 0.5 too. That is just above
+  `HUMAN_THRESHOLD = 0.50`. *Stage: the signals, where neither separates
+  ordinary human writing from AI, and the label mapping, where the human line
+  sits right where ordinary writing lands. Mechanism: when both signals say
+  "about 0.5", a human line at exactly 0.50 turns "can't tell" into unsure
+  for most real writing.*
+
+**Criterion 2 missed (gap 0.203, target ≥ 0.30): neither signal separates
+the groups by 0.30 on its own, and the combining rule can't add separation
+the signals don't have.**
+
+| Group average | My 5 | AI 5 | Gap |
+|---|---|---|---|
+| model | 0.5049 | 0.7249 | 0.220 |
+| style | 0.3611 | 0.5244 | 0.163 |
+| combined | 0.4618 | 0.6647 | **0.203** |
+
+When the cap doesn't fire, the combined gap is just the weighted gap of the
+signals: 0.7 × 0.220 + 0.3 × 0.163 = 0.203, exactly what came back. A
+weighted average can't separate two groups more than its best input does, so
+no weighting of these two signals reaches 0.30. The biggest single drag is
+**AI5** ("Why do you enjoy talking with me", model 0.43). It isn't an essay.
+It's Claude hedging about its own experience and naming details from our
+earlier conversations (LeetCode, a blog), and that is much less predictable
+than "Reading is important because…". But AI5 isn't the whole cause: without
+it, the gap is still only 0.240. *Stage: both signals. Mechanism: on ordinary
+writing, both give a reading near the middle for my text and only a little
+higher for AI text. The difference is real but small, and averaging two small
+differences gives a small difference.* (As noted under the verdict, the
+0.30 target's own reasoning predates the threshold change. I'm treating that
+as a finding, not a reason to move the target.)
+
+### The pattern across the misses
+
+Counting by stage across the 13 broken attacks (an attack with two causes is
+counted at both):
+
+| Stage | Groups | Attacks |
+|---|---|---|
+| Signal two | A, C, F | 8 (EV02, EV05, EV06, PI01, PI02, EV08, MF07, MF04) |
+| Signal one | B, D | 5 (FP02–FP05, EV01) |
+| Combining rule | C, E | 5 (EV08, MF07, EV01, EV02, EV06) |
+| Route | C (MF07), F | 2 |
+| Label mapping | — | 0 attacks, but criterion 1 |
+
+**1. Signal two is the stage that breaks most, and always at its edges.**
+In the middle of its range it does real work. It caught EV01 when signal one
+didn't. All three of its failures come from what it does when the input
+leaves the ordinary range. Above a spread of 0.6, the clamp gives 0.00,
+"certainly human" (A). Under 3 sentences it gives a made-up 0.5 (C). With no
+countable words it crashes (F). None of those three outputs is a measurement,
+but the combining rule treats all three as one.
+
+**2. My system can't say "I couldn't read this".** C, F, the probes and
+MF07 are one problem seen from different sides. When a signal has nothing to
+measure, it either invents a number (0.5) or crashes. The labels have no way
+to say "this text is outside what the check can read". So a sentence of
+Arabic gets the most confident verdict of the whole run.
+
+**3. Both signals measure regularity, not authorship.** Signal one rewards
+predictable words, and signal two rewards even sentence lengths. Careful
+human writing has both (B, and #1, #3, #4 in criterion 1). AI text can lose
+both with typos or a few one-word sentences (A, D). That is why criterion 2's
+gap is small. The two signals agree with each other more than either one
+agrees with the truth.
+
+**4. My protections only face one way.** The disagreement cap was meant to
+turn disagreement into unsure. It only stops ai labels (E), so it never stops
+AI text from getting through. That was a choice I made without noticing it.
+
+**The criterion I'd tighten:** criterion 5. "Never crashes" was tested with
+nine inputs I chose myself, and all nine were inputs I'd already handled. The
+crash came from an input I hadn't imagined. A tighter version would include
+every malformed family in the attack set. Criterion 3 is the other candidate:
+it is met, but exactly on the line, with five essays.
+
+**Not reached (RQ10, RQ11).** These aren't diagnosed, because they never got
+to the pipeline. Both lacked a `creator_id`, so both counted against my
+address, and five earlier requests without a `creator_id` had used up its 5
+per minute. The limiter answered first. This is a flaw in how the test was
+set up, not a result, and fixing it means running these two on their own.
 
 
 
