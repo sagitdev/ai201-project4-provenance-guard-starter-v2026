@@ -1928,4 +1928,39 @@ back up.
 
 ---
 
+## Capstone
+
+**What This Extends**
+
+Provenance Guard, my unit 7–8 system: a Flask service that scores a piece of
+writing with two signals (GPT-2 predictability and sentence-length spread) and
+returns a guess, a plain-English label and a way to appeal. Until now it only
+ever ran under Flask's development server on my laptop, and its audit log
+recorded what was decided but not how long anything took. What's new is the
+timing layer: every request, including the ones that are rejected or fail,
+leaves a log record that says how long it took end to end and in each stage.
+
+**The Shape**
+
+Shape A — deploy and instrument. I'm adding timing to the log I already have:
+every record gets a total duration and a per-stage breakdown (model signal,
+style signal, combining, writing the log), plus the size of the input. Records
+for rejected requests (400, 429) and errors (500) get the same timing, so a
+failure shows up as a record rather than an absence. The service runs under
+gunicorn from one documented command (see Running It).
+
+Out of scope:
+
+- **Detection accuracy.** I'm not fixing the unit 8 leftovers (the
+  one-way disagreement cap, the style clamp at 0.00, careful writing read as
+  AI), and I'm not touching any threshold, weight or scoring rule. If the
+  scores changed, I couldn't tell which change moved the numbers in the log.
+- **Hosting.** torch plus the GPT-2 weights is over a free tier's 512 MB
+  before the first request, so this runs locally with a committed log
+  (Path B).
+- **A dashboard or monitoring stack.** No Grafana, Prometheus or `/metrics`
+  endpoint. The log file is the instrument, and a small script reads it back.
+
+---
+
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
