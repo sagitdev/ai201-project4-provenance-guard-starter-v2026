@@ -24,9 +24,10 @@ Routes:
     GET  /health      is the service up, and is the model loaded
 """
 
+import time
 import uuid
 
-from flask import Flask, jsonify, request
+from flask import Flask, g, jsonify, request
 
 import audit
 import config
@@ -38,6 +39,44 @@ import stylometry
 
 app = Flask(__name__)
 
+
+# ── Timing — CAPSTONE ─────────────────────────────────────────────────────────
+# 每个请求一进来就记下开始时间，写日志时算出一共花了多少毫秒（duration_ms）。
+# ⚠️ 这个 before_request 必须写在限流器创建之前：Flask 按注册顺序运行 before_request，
+# 限流器也是用 before_request 检查次数的。如果它排在前面，429 请求在计时开始前就被拦下，
+# 被限流的记录就没有耗时了。
+# perf_counter() 是专门用来量时间间隔的时钟，不受系统改时间的影响；它的值本身没有意义，
+# 只有两次相减才有意义。
+
+@app.before_request # 每个请求一进门，不管它要去那里，都先执行 start_timer()，把开始时间记在 g.start 里。g 是 Flask 提供的全局对象，专门用来在同一个请求内部传递数据。
+def start_timer():
+    g.start = time.perf_counter()
+
+# 算出过了多少毫秒
+def elapsed_ms():
+    """Milliseconds since this request arrived, or None outside a request."""
+    start = g.get("start")
+    if start is None:
+        return None
+    return round((time.perf_counter() - start) * 1000, 1) # 现在的秒表读数减去进门时的读数，得到过了多少秒
+    # * 1000 秒换成毫秒 ; round(..., 1) 保留一位小数，避免日志里出现 123.4567890123456789 这种不必要的精度。
+
+# 把三个字段打包成一个字典，写进日志。http_status 是响应的状态码，200、400、429 之类的。
+def timing_fields(http_status):
+    """
+    The fields every capstone log record carries, whatever happened.
+
+    duration_ms stops just before the log line is written: the write can't time
+    itself into the record it is writing.
+    """
+    return {
+        "endpoint": request.path, # request.path：Flask 自动知道这个请求去的是哪个窗口；比如"/submit"
+        "http_status": http_status, # 调用的人传进来的参数
+        "duration_ms": elapsed_ms(),
+    }
+# 为什么 http_status 要从外面传进来？ 因为写日志的时候，Flask 还不知道你最后会返回什么状态码，响应还没发出去。只有调用的那段代码自己知道"我接下来要返回 400"，所以由它告诉 timing_fields。
+# 看它被调用的地方，比如 reject() 里：audit.log_rejection(creator_id=creator_id, reason=error, **timing_fields(status))
+# ** 的意思是"把字典拆开，每一项变成一个参数"。所以**timing_fields(400)就等于直接写：endpoint="/submit", http_status=400, duration_ms=0.4
 
 def usable_creator_id(value):
     """
@@ -130,6 +169,7 @@ if config.RATE_LIMITING_ENABLED:
             creator_id=usable_creator_id(payload.get("creator_id")),
             reason="rate_limited",
             limit=str(exc.description),
+            **timing_fields(429),
         )
         return jsonify({
             "error": "rate_limited",
@@ -184,7 +224,8 @@ def reject(error, message, creator_id=None, status=400):
     """
     # endpoint 记下是哪个路由拒绝的。/submit 和 /appeal 都会出现 invalid_json 这类错误，
     # 不写的话，Unit 8 读日志时分不清是谁拒绝的。request.path 由 Flask 自动提供，调用的地方不用改。
-    audit.log_rejection(creator_id=creator_id, reason=error, endpoint=request.path)
+    # Capstone：timing_fields 里也带了 endpoint，和原来的写法记录的是同一个值。
+    audit.log_rejection(creator_id=creator_id, reason=error, **timing_fields(status))
     return jsonify({
         "error": error,
         "message": message,
@@ -289,6 +330,7 @@ def submit():
         style_score = style_score,
         combined_score = confidence,
         label = label,
+        **timing_fields(200),
     )
 
     return jsonify({
@@ -382,7 +424,12 @@ def appeal():
         )
 
     # 只追加，不改原来的 decided 记录：日志里能看到"先判定、后被申诉"的顺序。
-    audit.log_appeal(content_id=content_id, creator_id=creator_id, reasoning=reasoning.strip())
+    audit.log_appeal(
+        content_id=content_id,
+        creator_id=creator_id,
+        reasoning=reasoning.strip(),
+        **timing_fields(200),
+    )
 
     # 用 "received" 而不是 "successful"：还没有人做出决定，不能让写作者以为已经赢了。
     return jsonify({

@@ -76,7 +76,7 @@ def log_decision(
     return _append(entry)
 
 
-def log_appeal(content_id: str, creator_id: str, reasoning: str) -> dict:
+def log_appeal(content_id: str, creator_id: str, reasoning: str, **extra) -> dict:
     """
     Record an appeal beside the original decision.
 
@@ -92,6 +92,8 @@ def log_appeal(content_id: str, creator_id: str, reasoning: str) -> dict:
         "event": "appeal",
         "status": "under_review",
         "reasoning": reasoning,
+        # Capstone：和 log_decision、log_rejection 一样，接受额外字段（耗时、状态码）。
+        **extra,
     })
 
 
