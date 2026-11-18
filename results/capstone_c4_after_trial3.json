@@ -1,0 +1,239 @@
+{
+  "criterion": 4,
+  "trial": 3,
+  "slowest_client_ms": 552.2,
+  "largest_gap_ms": 5.3,
+  "a_met": true,
+  "b_met": true,
+  "met": true,
+  "rows": [
+    {
+      "group": "100w",
+      "text": 1,
+      "chars": 538,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 225.1,
+      "duration_ms": 220.5,
+      "stage_ms": {
+        "model": 219.4,
+        "style": 0.3,
+        "combined": 0.0
+      },
+      "gap_ms": 4.6,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "100w",
+      "text": 2,
+      "chars": 509,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 189.6,
+      "duration_ms": 185.8,
+      "stage_ms": {
+        "model": 184.8,
+        "style": 0.3,
+        "combined": 0.0
+      },
+      "gap_ms": 3.8,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "100w",
+      "text": 3,
+      "chars": 616,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 192.6,
+      "duration_ms": 188.4,
+      "stage_ms": {
+        "model": 187.4,
+        "style": 0.3,
+        "combined": 0.0
+      },
+      "gap_ms": 4.2,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "300w",
+      "text": 1,
+      "chars": 1550,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 442.6,
+      "duration_ms": 439.0,
+      "stage_ms": {
+        "model": 437.7,
+        "style": 0.5,
+        "combined": 0.0
+      },
+      "gap_ms": 3.6,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "300w",
+      "text": 2,
+      "chars": 1673,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 437.6,
+      "duration_ms": 434.0,
+      "stage_ms": {
+        "model": 432.7,
+        "style": 0.6,
+        "combined": 0.0
+      },
+      "gap_ms": 3.6,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "300w",
+      "text": 3,
+      "chars": 1707,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 489.9,
+      "duration_ms": 486.2,
+      "stage_ms": {
+        "model": 485.0,
+        "style": 0.5,
+        "combined": 0.0
+      },
+      "gap_ms": 3.7,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "1000w",
+      "text": 1,
+      "chars": 5560,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 496.5,
+      "duration_ms": 492.9,
+      "stage_ms": {
+        "model": 490.6,
+        "style": 1.5,
+        "combined": 0.0
+      },
+      "gap_ms": 3.6,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "1000w",
+      "text": 2,
+      "chars": 5696,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 503.9,
+      "duration_ms": 500.1,
+      "stage_ms": {
+        "model": 497.9,
+        "style": 1.5,
+        "combined": 0.0
+      },
+      "gap_ms": 3.8,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "1000w",
+      "text": 3,
+      "chars": 5755,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 492.9,
+      "duration_ms": 489.2,
+      "stage_ms": {
+        "model": 486.8,
+        "style": 1.5,
+        "combined": 0.0
+      },
+      "gap_ms": 3.7,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "49k",
+      "text": 1,
+      "chars": 48999,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 552.2,
+      "duration_ms": 546.9,
+      "stage_ms": {
+        "model": 533.1,
+        "style": 11.6,
+        "combined": 0.0
+      },
+      "gap_ms": 5.3,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "49k",
+      "text": 2,
+      "chars": 48991,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 545.5,
+      "duration_ms": 540.3,
+      "stage_ms": {
+        "model": 527.0,
+        "style": 11.5,
+        "combined": 0.0
+      },
+      "gap_ms": 5.2,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "49k",
+      "text": 3,
+      "chars": 48993,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 551.8,
+      "duration_ms": 546.5,
+      "stage_ms": {
+        "model": 533.2,
+        "style": 11.5,
+        "combined": 0.0
+      },
+      "gap_ms": 5.3,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    }
+  ]
+}

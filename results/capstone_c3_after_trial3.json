@@ -1,0 +1,38 @@
+{
+  "criterion": 3,
+  "trial": 3,
+  "status_code": 200,
+  "new_lines": 1,
+  "error": null,
+  "client_ms": 11760.9,
+  "record": {
+    "timestamp": "2026-11-18T23:33:43+00:00",
+    "content_id": "8a9f7aff-b3f1-4f1b-8328-6fe5f252d660",
+    "creator_id": "m5_c3_t3",
+    "guess": "human",
+    "model_score": 0.5721,
+    "style_score": 0.0248,
+    "combined_score": 0.4079,
+    "label": "We think this was most likely written by a person.",
+    "status": "decided",
+    "stage_ms": {
+      "model": 11753.2,
+      "style": 2.3,
+      "combined": 0.0
+    },
+    "endpoint": "/submit",
+    "http_status": 200,
+    "duration_ms": 11756.4,
+    "model_was_loaded": false,
+    "text_chars": 5560,
+    "text_words": 1000,
+    "text_sha256": "19570fba79442fb6"
+  },
+  "checks": {
+    "one_new_line": true,
+    "status_200": true,
+    "model_was_loaded_false": true,
+    "duration_within_target": true
+  },
+  "met": true
+}

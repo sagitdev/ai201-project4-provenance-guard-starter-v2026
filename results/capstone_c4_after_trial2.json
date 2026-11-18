@@ -1,0 +1,239 @@
+{
+  "criterion": 4,
+  "trial": 2,
+  "slowest_client_ms": 592.2,
+  "largest_gap_ms": 5.5,
+  "a_met": true,
+  "b_met": true,
+  "met": true,
+  "rows": [
+    {
+      "group": "100w",
+      "text": 1,
+      "chars": 538,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 240.0,
+      "duration_ms": 235.4,
+      "stage_ms": {
+        "model": 234.2,
+        "style": 0.4,
+        "combined": 0.0
+      },
+      "gap_ms": 4.6,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "100w",
+      "text": 2,
+      "chars": 509,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 227.7,
+      "duration_ms": 223.5,
+      "stage_ms": {
+        "model": 222.4,
+        "style": 0.3,
+        "combined": 0.0
+      },
+      "gap_ms": 4.2,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "100w",
+      "text": 3,
+      "chars": 616,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 167.1,
+      "duration_ms": 162.8,
+      "stage_ms": {
+        "model": 161.7,
+        "style": 0.3,
+        "combined": 0.0
+      },
+      "gap_ms": 4.3,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "300w",
+      "text": 1,
+      "chars": 1550,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 528.8,
+      "duration_ms": 525.0,
+      "stage_ms": {
+        "model": 523.6,
+        "style": 0.8,
+        "combined": 0.0
+      },
+      "gap_ms": 3.8,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "300w",
+      "text": 2,
+      "chars": 1673,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 582.7,
+      "duration_ms": 578.6,
+      "stage_ms": {
+        "model": 577.3,
+        "style": 0.6,
+        "combined": 0.0
+      },
+      "gap_ms": 4.1,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "300w",
+      "text": 3,
+      "chars": 1707,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 497.0,
+      "duration_ms": 493.1,
+      "stage_ms": {
+        "model": 491.7,
+        "style": 0.5,
+        "combined": 0.0
+      },
+      "gap_ms": 3.9,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "1000w",
+      "text": 1,
+      "chars": 5560,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 565.2,
+      "duration_ms": 561.5,
+      "stage_ms": {
+        "model": 559.0,
+        "style": 1.7,
+        "combined": 0.0
+      },
+      "gap_ms": 3.7,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "1000w",
+      "text": 2,
+      "chars": 5696,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 505.8,
+      "duration_ms": 502.1,
+      "stage_ms": {
+        "model": 499.8,
+        "style": 1.5,
+        "combined": 0.0
+      },
+      "gap_ms": 3.7,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "1000w",
+      "text": 3,
+      "chars": 5755,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 502.7,
+      "duration_ms": 499.0,
+      "stage_ms": {
+        "model": 496.8,
+        "style": 1.5,
+        "combined": 0.0
+      },
+      "gap_ms": 3.7,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "49k",
+      "text": 1,
+      "chars": 48999,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 568.9,
+      "duration_ms": 563.4,
+      "stage_ms": {
+        "model": 548.4,
+        "style": 12.8,
+        "combined": 0.0
+      },
+      "gap_ms": 5.5,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "49k",
+      "text": 2,
+      "chars": 48991,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 592.2,
+      "duration_ms": 586.7,
+      "stage_ms": {
+        "model": 573.3,
+        "style": 11.6,
+        "combined": 0.0
+      },
+      "gap_ms": 5.5,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    },
+    {
+      "group": "49k",
+      "text": 3,
+      "chars": 48993,
+      "status_code": 200,
+      "error": null,
+      "new_lines": 1,
+      "client_ms": 554.2,
+      "duration_ms": 548.8,
+      "stage_ms": {
+        "model": 535.4,
+        "style": 11.5,
+        "combined": 0.0
+      },
+      "gap_ms": 5.4,
+      "valid": true,
+      "a_ok": true,
+      "b_ok": true
+    }
+  ]
+}
