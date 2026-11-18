@@ -1,0 +1,51 @@
+{
+  "criterion": 5,
+  "trial": 1,
+  "padded_lines": 46000,
+  "padded_bytes": 26044482,
+  "decisions_in_log": 36383,
+  "slowest_duration_ms": 810.3,
+  "met": true,
+  "rows": [
+    {
+      "appeal": 1,
+      "content_id": "d1aa33c3-b470-42e1-abd8-2418b663dc56",
+      "status_code": 200,
+      "duration_ms": 810.3,
+      "client_ms": 814.3,
+      "ok": true
+    },
+    {
+      "appeal": 2,
+      "content_id": "ac7fee5b-75de-40ca-b944-29809f8c8ca9",
+      "status_code": 200,
+      "duration_ms": 707.4,
+      "client_ms": 708.7,
+      "ok": true
+    },
+    {
+      "appeal": 3,
+      "content_id": "4ced93f3-44f7-4c7b-bb34-f9e1648f25d7",
+      "status_code": 200,
+      "duration_ms": 679.7,
+      "client_ms": 680.9,
+      "ok": true
+    },
+    {
+      "appeal": 4,
+      "content_id": "89c8ff2f-d6ac-4bc0-b4b2-81ddee5d74a1",
+      "status_code": 200,
+      "duration_ms": 686.7,
+      "client_ms": 688.1,
+      "ok": true
+    },
+    {
+      "appeal": 5,
+      "content_id": "e94efd59-3668-4046-8137-c2ec0523f497",
+      "status_code": 200,
+      "duration_ms": 774.0,
+      "client_ms": 775.7,
+      "ok": true
+    }
+  ]
+}
