@@ -2132,6 +2132,183 @@ Limits of this number:
 - This is wall-clock time on my laptop, not billed CPU time. Another machine
   would give other numbers.
 
+**Run Log and Verdicts**
+
+The five criteria are in [criteria.md](criteria.md), under *Capstone
+criteria*. They were committed before any of these runs (`fe25f3d`), and
+criterion 5 was corrected once, also before any run (`e937c98`: 40,000 →
+46,000 lines, because 40,000 lines in the 415–443 mix hold only about 31,700
+decisions, short of a year's 36,500).
+
+Three trials per criterion, nothing changed between them. Each trial wrote its
+own file, `results/capstone_c<n>_trial<k>.json`, and every script refuses to
+overwrite one.
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Every request leaves exactly one complete timing record, and no submitted text | All 8 checks, every trial (24/24 lines, 0 text matches) | 8/8 | 8/8 | 8/8 | MET |
+| 2. A crash returns a JSON 500, leaves a record, and the service stays usable | 4 of 4 faults | 3/4 | 3/4 | 3/4 | MISSED |
+| 3. A cold start uses at most half of gunicorn's 30 s timeout | 3 of 3 ≤ 15,000 ms | 11,904 ms | 11,451 ms | 11,389 ms | MET |
+| 4. A warm request answers within 1 s, even for the longest valid text | A: 12/12 client ≤ 1,000 ms; B: 12/12 gaps ≤ 50 ms | 874 ms / 14.4 ms | 847 ms / 5.6 ms | 628 ms / 5.4 ms | MET |
+| 5. After a year of log, an appeal still answers within 1 s | 5/5 appeals ≤ 1,000 ms | 810 ms | 771 ms | 761 ms | MET |
+
+Criterion 4's cells are the slowest client time / the largest gap in that
+trial; criterion 5's is the slowest appeal.
+
+How the runs were done:
+
+- **Criteria 1, 3 and 4** ran against the real service under gunicorn (one
+  worker), and wrote to the committed `logs/audit.jsonl` (lines 444–557).
+  Criterion 1 restarted the service before each trial; criterion 3 also ran
+  `sudo purge` first; criterion 4 used one warm service and sent a warm-up
+  request before each trial.
+- **Criteria 2 and 5** ran in a test process (`app.test_client()`) with
+  `config.AUDIT_LOG` pointed at a temporary file, as criteria.md says. The
+  real log wasn't written. That means criterion 2 tested the error handler,
+  not gunicorn's behaviour after a crash.
+- **Checking the test scripts before the real trials:** with Claude, I ran
+  `capstone_c2.py` and `capstone_c5.py` once each from a scratch folder
+  (numbered trial 9, not committed), ran `capstone_c1.py` against an in-process
+  copy of the service with a scratch log, and simulated a dropped connection
+  for `capstone_c3.py`. Those runs found two mistakes in my scripts — wrong
+  expected status codes in c1, and a c5 line target of one year *in seconds*
+  (31.5 million lines, about 20 GB) instead of 46,000 — and both were fixed
+  before any real trial. The c2 scratch run already showed fault d returning
+  HTML, which is what I'd predicted when writing the criterion; I didn't change
+  any code because of it.
+- **Criteria 1, 2 and 5 came out identical in all three trials,** which is
+  expected: none of them depends on the model's numbers, only on what gets
+  logged and returned. Criteria 3 and 4 measure time and differ every trial.
+
+Real output, one trial per criterion. In the log lines, `label` is removed
+for length; the full records are in the results files.
+
+*Criterion 1* — `capstone_c1.py`, trial 1. The records were written by
+`app.py::submit` (via `audit.log_decision`), `app.py::reject` (via
+`audit.log_rejection`), `app.py::rate_limited` and `app.py::appeal` (via
+`audit.log_appeal`).
+
+```
+  bad: 50,001 chars      expected 400  got 400
+  repeat 5               expected 200  got 200
+  repeat 6               expected 429  got 429
+  repeat 7               expected 429  got 429
+  appeal: valid          expected 200  got 200
+  appeal: attestation    expected 400  got 400
+  appeal: not the owner  expected 403  got 403
+  appeal: no such id     expected 404  got 404
+  new log lines: 24   decisions: 11   texts searched: 8
+  PASS  exactly_24_new_lines
+  PASS  received_as_planned
+  PASS  status_matches_log_24_of_24
+  PASS  every_line_endpoint_and_duration
+  PASS  eleven_complete_decisions
+  PASS  exactly_one_cold
+  PASS  repeat_fingerprints_identical
+  PASS  eight_texts_zero_matches
+  -> MET this trial   (saved to results/capstone_c1_trial1.json)
+```
+
+```
+1  {"timestamp": "2026-11-18T07:24:26+00:00", "content_id": "f228fca9-01f5-4e68-9b71-2b6d6136efc8", "creator_id": "m5_c1_t1_n1", "guess": "unsure", "model_score": 0.5825, "style_score": 0.5556, "combined_score": 0.5744, "status": "decided", "stage_ms": {"model": 8175.8, "style": 0.5, "combined": 0.0}, "endpoint": "/submit", "http_status": 200, "duration_ms": 8177.1, "model_was_loaded": false, "text_chars": 365, "text_words": 60, "text_sha256": "4491d8d0a2f7f65b"}
+7  {"timestamp": "2026-11-18T07:24:27+00:00", "creator_id": null, "event": "rejected", "status": "rejected", "reason": "invalid_json", "endpoint": "/submit", "http_status": 400, "duration_ms": 0.6}
+13 {"timestamp": "2026-11-18T07:24:27+00:00", "creator_id": "m5_bad", "event": "rejected", "status": "rejected", "reason": "text_too_long", "endpoint": "/submit", "http_status": 400, "duration_ms": 0.9}
+20 {"timestamp": "2026-11-18T07:24:27+00:00", "creator_id": "m5_c1_t1_repeat", "event": "rejected", "status": "rejected", "reason": "rate_limited", "limit": "5 per 1 minute", "endpoint": "/submit", "http_status": 429, "duration_ms": 0.4}
+21 {"timestamp": "2026-11-18T07:24:27+00:00", "content_id": "f228fca9-01f5-4e68-9b71-2b6d6136efc8", "creator_id": "m5_c1_t1_n1", "event": "appeal", "status": "under_review", "endpoint": "/appeal", "http_status": 200, "duration_ms": 5.1}
+23 {"timestamp": "2026-11-18T07:24:27+00:00", "creator_id": "m5_c1_t1_n2", "event": "rejected", "status": "rejected", "reason": "not_your_content", "endpoint": "/appeal", "http_status": 403, "duration_ms": 5.4}
+```
+
+The text check (`text_matches` in the results file): all 8 probes, 0 matches.
+To make sure the search could find text at all, it was also run with a
+40-character piece of a label that *is* logged, which matched 10 times.
+
+*Criterion 2* — `capstone_c2.py`, trial 1. The JSON 500s and the error records
+come from `app.py::server_error` (via `audit.log_error`).
+
+```
+  a. model signal  status 500  application/json
+      PASS  status_500
+      PASS  json_error_and_message
+      PASS  no_content_id
+      PASS  follow_up_200
+      PASS  one_error_record
+  b. style signal  status 500  application/json
+      PASS  ...   (same five, all PASS)
+  c. combining     status 500  application/json
+      PASS  ...   (same five, all PASS)
+  d. log write     status 500  text/html; charset=utf-8
+      PASS  status_500
+      FAIL  json_error_and_message
+      PASS  no_content_id
+      PASS  follow_up_200
+      PASS  logger_shows_oserror
+  -> MISSED this trial   (saved to results/capstone_c2_trial1.json)
+```
+
+The error records for a, b and c (from the temporary log):
+
+```
+{"timestamp": "2026-11-18T07:34:27+00:00", "creator_id": "m5_c2_t1_f1", "event": "error", "status": "error", "error_type": "RuntimeError", "error_message": "simulated model failure", "endpoint": "/submit", "http_status": 500, "duration_ms": 7.1}
+{"timestamp": "2026-11-18T07:34:35+00:00", "creator_id": "m5_c2_t1_f2", "event": "error", "status": "error", "error_type": "RuntimeError", "error_message": "simulated style failure", "endpoint": "/submit", "http_status": 500, "duration_ms": 125.1}
+{"timestamp": "2026-11-18T07:34:35+00:00", "creator_id": "m5_c2_t1_f3", "event": "error", "status": "error", "error_type": "RuntimeError", "error_message": "simulated combine failure", "endpoint": "/submit", "http_status": 500, "duration_ms": 98.1}
+```
+
+For d: the response body was HTML (Flask's own error page), so it has no
+`error` or `message` field; no line was written (the log is what failed); and
+`app.logger` showed `OSError: [Errno 28] No space left on device` **twice**.
+
+*Criterion 3* — `capstone_c3.py`, trial 1, after a restart and `sudo purge`.
+The record was written by `app.py::submit`.
+
+```
+trial 1: status 200  duration_ms 11904.0  client 11908.8 ms  model_was_loaded False
+  PASS  one_new_line
+  PASS  status_200
+  PASS  model_was_loaded_false
+  PASS  duration_within_target
+  -> MET this trial   (saved to results/capstone_c3_trial1.json)
+```
+
+```
+{"timestamp": "2026-11-18T06:55:04+00:00", "content_id": "64e14b88-4aba-4523-a245-34341305f9e3", "creator_id": "m5_c3_t1", "guess": "human", "model_score": 0.5721, "style_score": 0.0248, "combined_score": 0.4079, "status": "decided", "stage_ms": {"model": 11901.1, "style": 1.9, "combined": 0.0}, "endpoint": "/submit", "http_status": 200, "duration_ms": 11904.0, "model_was_loaded": false, "text_chars": 5560, "text_words": 1000, "text_sha256": "19570fba79442fb6"}
+```
+
+*Criterion 4* — `capstone_c4.py`, trial 1. `client` is timed by the script;
+`duration` and `model ms` are from the records `app.py::submit` wrote.
+
+```
+trial 1
+  group   # status    client  duration    gap  model ms
+  100w    1    200     258.9     254.2    4.7  252.9
+  100w    2    200     194.9     190.5    4.4  189.4
+  100w    3    200     168.1     164.5    3.6  163.6
+  300w    1    200     500.8     497.2    3.6  496.0
+  300w    2    200     630.9     626.6    4.3  625.0
+  300w    3    200     543.2     538.7    4.5  537.2
+  1000w   1    200     598.2     594.3    3.9  592.0
+  1000w   2    200     874.1     870.2    3.9  867.4
+  1000w   3    200     571.0     566.1    4.9  563.5
+  49k     1    200     629.5     624.3    5.2  610.2
+  49k     2    200     613.2     607.9    5.3  594.3
+  49k     3    200     617.5     603.1   14.4  588.1
+  A (all client ≤ 1000 ms): PASS   slowest 874.1 ms
+  B (all gaps ≤ 50 ms):      PASS   largest 14.4 ms
+  -> MET this trial   (saved to results/capstone_c4_trial1.json)
+```
+
+*Criterion 5* — `capstone_c5.py`, trial 1. The appeals go through
+`app.py::appeal`, which calls `audit.entries_for` to find the decision.
+
+```
+trial 1: padded log 46,000 lines, 26.0 MB, 36,383 decisions
+  appeal 1  status 200  duration 810.3 ms  client 814.3 ms  PASS
+  appeal 2  status 200  duration 707.4 ms  client 708.7 ms  PASS
+  appeal 3  status 200  duration 679.7 ms  client 680.9 ms  PASS
+  appeal 4  status 200  duration 686.7 ms  client 688.1 ms  PASS
+  appeal 5  status 200  duration 774.0 ms  client 775.7 ms  PASS
+  -> MET this trial   (saved to results/capstone_c5_trial1.json)
+```
+
 ---
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
