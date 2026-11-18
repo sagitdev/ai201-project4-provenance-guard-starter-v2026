@@ -403,6 +403,34 @@ curl "http://127.0.0.1:5000/log?limit=5"
 
 `Ctrl + C` in the terminal running gunicorn.
 
+**Closing the terminal window doesn't always stop it.** I found this the hard
+way: a gunicorn started during my clean-clone test kept running in the
+background after I closed its window, and the next start failed with
+`[Errno 48] Address already in use`. Worse, anything sent to port 5000 would
+have reached the old copy and been logged in the *other* folder's
+`logs/audit.jsonl`, with nothing on screen to say so.
+
+Before starting, or if you see `Address already in use`, check who has the
+port:
+
+```bash
+lsof -nP -iTCP:5000 -sTCP:LISTEN
+```
+
+No output means the port is free. Otherwise, the `PID` column lists the
+gunicorn processes; stop the lowest one (the master), and it takes its worker
+with it:
+
+```bash
+kill <PID>
+```
+
+To see which folder a running copy belongs to:
+
+```bash
+lsof -a -p <PID> -d cwd
+```
+
 
 ---
 
