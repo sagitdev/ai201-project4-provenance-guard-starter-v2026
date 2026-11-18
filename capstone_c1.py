@@ -27,7 +27,9 @@ BASE = "http://127.0.0.1:5000"
 JSON_HEADER = {"Content-Type": "application/json"}
 
 trial = int(sys.argv[1])
-out = Path("results") / f"capstone_c1_trial{trial}.json"
+# out = Path("results") / f"capstone_c1_trial{trial}.json"
+suffix = f"_{sys.argv[2]}" if len(sys.argv) > 2 else ""
+out = Path("results") / f"capstone_c1{suffix}_trial{trial}.json"
 if out.exists():
     sys.exit(f"{out} already exists. Results are evidence; not overwriting.")
 

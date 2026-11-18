@@ -21,7 +21,9 @@ from unittest import mock
 import config
 
 trial = int(sys.argv[1])
-out = Path("results") / f"capstone_c2_trial{trial}.json"
+# out = Path("results") / f"capstone_c2_trial{trial}.json"
+suffix = f"_{sys.argv[2]}" if len(sys.argv) > 2 else ""
+out = Path("results") / f"capstone_c2{suffix}_trial{trial}.json"
 if out.exists():
     sys.exit(f"{out} already exists. Results are evidence; not overwriting.")
 

@@ -194,12 +194,15 @@ def server_error(exc):
     if not isinstance(payload, dict):
         payload = {}
 
-    audit.log_error(
-        creator_id=usable_creator_id(payload.get("creator_id")),
-        error_type=type(exc).__name__, # 错误的类型名，比如上次的 TypeError
-        error_message=str(exc)[:200], # 错误的说明文字，比如 “unsupported operand type(s)...”，最多保留 200 个字符，防止日志里出现特别长的内容
-        **timing_fields(500),
-    )
+    try:
+        audit.log_error(
+            creator_id=usable_creator_id(payload.get("creator_id")),
+            error_type=type(exc).__name__, # 错误的类型名，比如上次的 TypeError
+            error_message=str(exc)[:200], # 错误的说明文字，比如 “unsupported operand type(s)...”，最多保留 200 个字符，防止日志里出现特别长的内容
+            **timing_fields(500),
+        )
+    except Exception:
+        app.logger.exception("Could not write the error record for %s", request.path)
 
     return jsonify({
         "error": "server_error",

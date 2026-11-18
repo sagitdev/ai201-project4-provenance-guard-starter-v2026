@@ -23,7 +23,9 @@ TARGET_LINES = 46_000 # 每天 100 次提交 × 365 天 = 36,500 条判定; 按�
 TARGET_MS = 1_000
 
 trial = int(sys.argv[1])
-out = Path("results") / f"capstone_c5_trial{trial}.json"
+# out = Path("results") / f"capstone_c5_trial{trial}.json"
+suffix = f"_{sys.argv[2]}" if len(sys.argv) > 2 else ""
+out = Path("results") / f"capstone_c5{suffix}_trial{trial}.json"
 if out.exists():
     sys.exit(f"{out} already exists. Results are evidence; not overwriting.")
 

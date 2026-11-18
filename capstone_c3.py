@@ -28,7 +28,9 @@ BASE = "http://127.0.0.1:5000"
 TARGET_MS = 15_000
 
 trial = int(sys.argv[1])
-out = Path("results") / f"capstone_c3_trial{trial}.json"
+# out = Path("results") / f"capstone_c3_trial{trial}.json"
+suffix = f"_{sys.argv[2]}" if len(sys.argv) > 2 else ""
+out = Path("results") / f"capstone_c3{suffix}_trial{trial}.json"
 if out.exists():
     sys.exit(f"{out} already exists. Results are evidence; not overwriting.")
 
