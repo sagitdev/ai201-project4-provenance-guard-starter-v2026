@@ -482,7 +482,7 @@ hold):
 
 **Test:**
 
-- Copy the log to a temporary location and pad it to **40,000** lines by
+- Copy the log to a temporary location and pad it to **46,000** lines by
   copying lines 415–443 of the real log over and over, giving each decision a
   new `content_id`. That keeps the line lengths, and the mix of decisions,
   rejections and appeals, the same as the real log. Reading a file takes time
@@ -500,11 +500,13 @@ hold):
   accusation.
 - **It belongs to this extension:** `audit.entries_for` reads the whole log on
   every appeal. The 5.5 ms in M3 was measured on 443 lines and says nothing
-  about line 40,000. Every line this extension adds makes every future appeal
+  about line 46,000. Every line this extension adds makes every future appeal
   slower.
 - **Which decision an appeal targets doesn't matter:** `entries_for` reads and
   parses the whole file whichever one it's looking for. So the 5 appeals are 5
   samples of the same operation, not a comparison of positions.
 - **Why a year:** nothing in the design ever trims the log, so its size depends
   only on how long the service has run. A year is the shortest time I'd call
-  "in production".
+  "in production". At the README's 100 submissions a day, a year is
+  100 × 365 = 36,500 decisions. In the mix of lines 415–443 (23 decisions in
+  every 29 lines), that's 36,500 × 29 / 23 ≈ 46,000 lines.
