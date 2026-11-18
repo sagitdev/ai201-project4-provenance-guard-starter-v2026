@@ -297,6 +297,114 @@ in your handler.
 
 ---
 
+## Capstone: running it (Path B)
+
+**Why Path B.** One process holding torch and the GPT-2 weights peaked at
+**786 MB** of memory after scoring a single text (measured with
+`resource.getrusage` right after `detector.model_signal`). A free host gives
+512 MB, so the service is over budget before its first request. It runs
+locally under gunicorn instead, with its log committed. The full arithmetic
+is in the README, under Capstone → **Running It**.
+
+### What you need
+
+| | |
+|---|---|
+| Python | 3.11, 3.12 or 3.13 — tested on **3.12.10**. Not 3.14 |
+| Machine | Tested on macOS 15.7 (Intel, x86_64), CPU only |
+| Memory | About 800 MB free for the service (786 MB peak, measured) |
+| Disk | About 1 GB for `.venv` (963 MB measured) plus 525 MB for the model |
+| The model | `gpt2`, **525 MB**, downloaded once into `~/.cache/huggingface/hub/models--gpt2` |
+| Dependencies | `requirements-lock.txt` pins the exact versions this was tested with (Flask 3.1.3, Flask-Limiter 3.12, gunicorn 23.0.0, torch 2.2.2, transformers 4.57.6, and everything they pull in). `requirements.txt` keeps the allowed ranges |
+| Network | Only for the first model download |
+
+### Setup, from a clean clone
+
+```bash
+git clone https://github.com/sagitdev/ai201-project4-provenance-guard-starter-v2026.git
+cd ai201-project4-provenance-guard-starter-v2026
+python3 --version                  # must say 3.11, 3.12 or 3.13
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\Activate.ps1
+pip install -r requirements-lock.txt
+python detector.py                 # first run downloads the model (~525 MB)
+python test.py                     # expect: 9 passed, 0 failed
+```
+
+If `requirements-lock.txt` won't install on your machine (the pins are for the
+machine above), use `pip install -r requirements.txt` instead and say so when
+you report numbers.
+
+### Start it — the one command
+
+```bash
+gunicorn app:app --bind 127.0.0.1:5000 --workers 1
+```
+
+`app:app` is the `app` object in `app.py`. Run it from the project folder with
+the virtual environment active.
+
+**Why exactly one worker.** Each gunicorn worker is a separate process, and
+three things in this service only work inside one process:
+
+- each worker would load its own copy of GPT-2 (~786 MB each);
+- the rate-limit counts live in that process's memory, so two workers would
+  each allow 5 per minute;
+- `audit.py`'s lock only stops threads in the same process from writing at
+  once, not two processes, so their lines could interleave in the log.
+
+**The first `/submit` is slow.** The model loads on the first submission, not
+at start-up. That request took 8–14 seconds in my runs; the ones after it take
+about 60 ms. gunicorn kills a worker whose request runs past 30 seconds, so a
+much slower machine could see that first request fail.
+
+Under gunicorn, `app.run()` is never called, so Flask's debugger is off.
+
+### Check it's running
+
+In a second terminal:
+
+```bash
+curl -X POST http://127.0.0.1:5000/ping -H "Content-Type: application/json" -d '{"message": "hello"}'
+```
+
+```bash
+curl http://127.0.0.1:5000/health
+```
+
+`/health` says `"detector_loaded": false` until the first `/submit`, then
+`true`.
+
+```bash
+curl -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" -d '{"creator_id": "readme_check", "text": "I walked to the store this morning and bought bread. It was cold, so I hurried back home before the rain started."}'
+```
+
+Rate limiting is on: 5 submissions a minute and 50 a day per `creator_id`.
+The counts are in memory, so restarting the service resets them.
+
+### Where the record goes
+
+Every request that reaches `/submit` or `/appeal` — decided, rejected, rate
+limited or crashed — appends one JSON line to `logs/audit.jsonl`. The file is
+append-only and committed.
+
+Lines 1–414 are from units 7–8. Lines after that are in the capstone format,
+which adds `endpoint`, `http_status` and `duration_ms` to every record, and
+`stage_ms`, `model_was_loaded`, `text_chars`, `text_words` and `text_sha256` to
+every decision. The text itself is never logged. What each field means is in
+the README under Capstone → **Instrumentation**.
+
+```bash
+curl "http://127.0.0.1:5000/log?limit=5"
+```
+
+### Stop it
+
+`Ctrl + C` in the terminal running gunicorn.
+
+
+---
+
 ## A note on committing
 
 At least four new commits in unit 7, four more in unit 8.
