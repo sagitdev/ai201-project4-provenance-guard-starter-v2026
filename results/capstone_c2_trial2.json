@@ -1,0 +1,138 @@
+{
+  "criterion": 2,
+  "trial": 2,
+  "scratch_log": "/var/folders/cs/n2lkfkz13cdds_p2srlvgk3w0000gn/T/capstone_c2_bnlh0amk/audit.jsonl",
+  "met": false,
+  "rows": [
+    {
+      "fault": "a. model signal",
+      "patched": "detector.model_signal",
+      "status_code": 500,
+      "content_type": "application/json",
+      "body": {
+        "error": "server_error",
+        "message": "Something went wrong on our side. Please try again later."
+      },
+      "error": null,
+      "new_log_lines": [
+        {
+          "timestamp": "2026-11-18T07:35:00+00:00",
+          "creator_id": "m5_c2_t2_f1",
+          "event": "error",
+          "status": "error",
+          "error_type": "RuntimeError",
+          "error_message": "simulated model failure",
+          "endpoint": "/submit",
+          "http_status": 500,
+          "duration_ms": 4.0
+        }
+      ],
+      "logger_mentions": [
+        "RuntimeError: simulated model failure"
+      ],
+      "follow_up_status": 200,
+      "checks": {
+        "status_500": true,
+        "json_error_and_message": true,
+        "no_content_id": true,
+        "follow_up_200": true,
+        "one_error_record": true
+      },
+      "ok": true
+    },
+    {
+      "fault": "b. style signal",
+      "patched": "stylometry.style_signal",
+      "status_code": 500,
+      "content_type": "application/json",
+      "body": {
+        "error": "server_error",
+        "message": "Something went wrong on our side. Please try again later."
+      },
+      "error": null,
+      "new_log_lines": [
+        {
+          "timestamp": "2026-11-18T07:35:07+00:00",
+          "creator_id": "m5_c2_t2_f2",
+          "event": "error",
+          "status": "error",
+          "error_type": "RuntimeError",
+          "error_message": "simulated style failure",
+          "endpoint": "/submit",
+          "http_status": 500,
+          "duration_ms": 150.7
+        }
+      ],
+      "logger_mentions": [
+        "RuntimeError: simulated style failure"
+      ],
+      "follow_up_status": 200,
+      "checks": {
+        "status_500": true,
+        "json_error_and_message": true,
+        "no_content_id": true,
+        "follow_up_200": true,
+        "one_error_record": true
+      },
+      "ok": true
+    },
+    {
+      "fault": "c. combining",
+      "patched": "scoring.combine_signals",
+      "status_code": 500,
+      "content_type": "application/json",
+      "body": {
+        "error": "server_error",
+        "message": "Something went wrong on our side. Please try again later."
+      },
+      "error": null,
+      "new_log_lines": [
+        {
+          "timestamp": "2026-11-18T07:35:07+00:00",
+          "creator_id": "m5_c2_t2_f3",
+          "event": "error",
+          "status": "error",
+          "error_type": "RuntimeError",
+          "error_message": "simulated combine failure",
+          "endpoint": "/submit",
+          "http_status": 500,
+          "duration_ms": 98.5
+        }
+      ],
+      "logger_mentions": [
+        "RuntimeError: simulated combine failure"
+      ],
+      "follow_up_status": 200,
+      "checks": {
+        "status_500": true,
+        "json_error_and_message": true,
+        "no_content_id": true,
+        "follow_up_200": true,
+        "one_error_record": true
+      },
+      "ok": true
+    },
+    {
+      "fault": "d. log write",
+      "patched": "audit._append",
+      "status_code": 500,
+      "content_type": "text/html; charset=utf-8",
+      "body": null,
+      "error": null,
+      "new_log_lines": [],
+      "logger_mentions": [
+        "OSError: [Errno 28] No space left on device",
+        "OSError: [Errno 28] No space left on device"
+      ],
+      "follow_up_status": 200,
+      "checks": {
+        "status_500": true,
+        "json_error_and_message": false,
+        "no_content_id": true,
+        "follow_up_200": true,
+        "logger_shows_oserror": true
+      },
+      "ok": false
+    }
+  ]
+}
