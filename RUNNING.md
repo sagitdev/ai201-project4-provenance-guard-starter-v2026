@@ -326,13 +326,13 @@ cd ai201-project4-provenance-guard-starter-v2026
 python3 --version                  # must say 3.11, 3.12 or 3.13
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\Activate.ps1
-pip install -r requirements-lock.txt
+python -m pip install -r requirements-lock.txt # Use python -m pip, not bare pip: if pip is aliased or points at another Python, it installs into the wrong place. (I hit this: my shell aliases pip to Python 3.9.)
 python detector.py                 # first run downloads the model (~525 MB)
 python test.py                     # expect: 9 passed, 0 failed
 ```
 
 If `requirements-lock.txt` won't install on your machine (the pins are for the
-machine above), use `pip install -r requirements.txt` instead and say so when
+machine above), use `python -m pip install -r requirements.txt` instead and say so when
 you report numbers.
 
 ### Start it — the one command
@@ -376,7 +376,8 @@ curl http://127.0.0.1:5000/health
 `true`.
 
 ```bash
-curl -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" -d '{"creator_id": "readme_check", "text": "I walked to the store this morning and bought bread. It was cold, so I hurried back home before the rain started."}'
+curl -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" -d '{"creator_id": "readme_check", "text": "I walked to the store this morning and bought bread. It was cold, so I hurried back home before the rain started. My neighbour waved at me from her window."}'
+# The example has three sentences on purpose: with fewer than three, the style signal has no reading, style_score comes back null, and the result is held at unsure.
 ```
 
 Rate limiting is on: 5 submissions a minute and 50 a day per `creator_id`.
