@@ -23,9 +23,9 @@ Routes:
     GET  /log         the audit log. Already works
     GET  /health      is the service up, and is the model loaded
 """
-
-import time
 import uuid
+import time
+import hashlib
 
 from flask import Flask, g, jsonify, request
 
@@ -319,7 +319,8 @@ def submit():
         )
 
     content_id = str(uuid.uuid4())# uuid4() 生成一个随机编号，str() 把它变成字符串，JSON 只认字符串。
-    
+
+    model_was_loaded = detector._model is not None # 先记下模型是否已经加载过了，写进日志。后面调用 model_signal 时，如果模型还没加载，它会在第一次调用时加载。
     t = time.perf_counter() # 调用 model_signal 之前，先记下时间点
     model_score = detector.model_signal(text) # GPT-2 干活
     model_ms = ms_since(t) # 调用 model_signal 之后，算出花了多少毫秒
@@ -349,6 +350,13 @@ def submit():
             "style": style_ms,
             "combined": combined_ms},
         **timing_fields(200),
+        model_was_loaded = model_was_loaded,
+        text_chars = len(text),
+        text_words = len(text.split()),
+        text_sha256 = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16],
+        # text.encode("utf-8")把文字变成"字节"。哈希算法只认字节，不认文字
+        # hashlib.sha256(...) 对字节计算指纹
+        # hexdigest() 把指纹写成 64 个字符的十六进制字符串（0–9、a–f）; [:16] 取前 16 个字符，够用又不占太多空间
     )
 
     return jsonify({
