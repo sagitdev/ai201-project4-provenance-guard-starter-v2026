@@ -116,6 +116,20 @@ def log_rejection(creator_id: str, reason: str, **extra) -> dict:
         **extra,
     })
 
+def log_error(creator_id:str | None, error_type:str, **extra) ->dict:
+    """
+    Record a request that crashed — a 500.
+
+    A crash that leaves no record shows up only as an absence.
+    """  
+    return _append({
+        "timestamp": _now(),
+        "creator_id": creator_id,
+        "event": "error",
+        "status": "error",
+        "error_type": error_type,
+        **extra,    
+    }) 
 
 def _append(entry: dict) -> dict:
     config.LOG_DIR.mkdir(parents=True, exist_ok=True)

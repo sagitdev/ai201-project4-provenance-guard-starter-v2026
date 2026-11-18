@@ -28,10 +28,10 @@ import time
 import hashlib
 
 from flask import Flask, g, jsonify, request
+from werkzeug.exceptions import HTTPException
 
 import audit
 import config
-
 import detector
 import scoring
 import stylometry
@@ -181,6 +181,30 @@ if config.RATE_LIMITING_ENABLED:
             "limit": str(exc.description),
         }), 429
 
+@app.errorhandler(Exception)
+def server_error(exc):
+    """Any crash becomes a logged 500 with a JSON body, not a silent gap."""
+    if isinstance(exc, HTTPException):
+        # 404、405 这类是正常的 HTTP 错误，不是崩溃，原样交给 Flask 处理。
+        return exc
+    app.logger.exception("Unhandled exception: %s", request.path) # 在终端里打印完整的出错信息。有了兜底函数，Flask 就不再自动打印了，没有这一行，在终端里会看不到错在哪一行
+    
+    # 和 rate_limited 里一模一样：尽量记下是谁的请求出了错
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+
+    audit.log_error(
+        creator_id=usable_creator_id(payload.get("creator_id")),
+        error_type=type(exc).__name__, # 错误的类型名，比如上次的 TypeError
+        error_message=str(exc)[:200], # 错误的说明文字，比如 “unsupported operand type(s)...”，最多保留 200 个字符，防止日志里出现特别长的内容
+        **timing_fields(500),
+    )
+
+    return jsonify({
+        "error": "server_error",
+        "message": "Something went wrong on our side. Please try again later.",
+    }), 500
 
 # ── The worked example. Already works. Don't edit. ────────────────────────────
 
