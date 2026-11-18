@@ -2309,6 +2309,183 @@ trial 1: padded log 46,000 lines, 26.0 MB, 36,383 decisions
   -> MET this trial   (saved to results/capstone_c5_trial1.json)
 ```
 
+How each verdict was called. Every target had to hold in all three trials,
+and every part of a target had to hold.
+
+- **1 — MET.** All 8 checks passed in all 3 trials: 24 lines each time, every
+  status code matched, 11 complete decisions with exactly one cold start, and
+  0 matches for all 8 texts.
+- **2 — MISSED.** The target is 4 of 4 faults. Faults a, b and c passed every
+  check in every trial; fault d returned an HTML page instead of JSON in all
+  three, so each trial was 3 of 4.
+- **3 — MET.** All three cold starts were under 15,000 ms (slowest 11,904 ms).
+- **4 — MET.** In every trial, all 12 client times were under 1,000 ms
+  (slowest 874 ms) and all 12 gaps were under 50 ms (largest 14.4 ms).
+- **5 — MET.** 15 of 15 appeals returned 200, all under 1,000 ms (slowest
+  810 ms).
+
+Diagnosis of the one miss — criterion 2, fault d.
+
+- **Stage:** `app.py::server_error`, the catch-all error handler I added in M2.
+- **Mechanism:** the handler can only answer after it has written an error
+  record, and it writes that record through the same `audit._append` that
+  fault d breaks. Step by step: `submit` → `audit.log_decision` → `_append`
+  raises `OSError` → `server_error` catches it and logs it with
+  `app.logger.exception` (the **first** `OSError` in the logger) → it calls
+  `audit.log_error` → `_append` raises `OSError` again → the error handler
+  itself has now failed, so no code of mine catches it → Flask takes over,
+  logs it (the **second** `OSError`) and returns its default HTML 500 page.
+  The handler depended on the very thing it was there to cover for.
+- **Why only d:** in a, b and c the broken function is the model, style or
+  combining step, and `_append` still works, so the handler writes its record
+  and answers in JSON. Only d breaks the log itself.
+- **What still held in d:** no `content_id` was returned, so no writer gets a
+  result they can't later appeal; the next request returned 200; and the
+  logger showed the cause.
+
+Pattern. There's only one miss, so the pattern is in the four that passed:
+three of them passed with little room. Criterion 3's slowest cold start was
+11.9 s against 15 s (1.26×); criterion 4's slowest warm request was 874 ms
+against 1,000 ms (13% spare), and the same text took 568–847 ms across trials,
+so that margin is within run-to-run noise; criterion 5's slowest appeal was
+810 ms against 1,000 ms.
+
+Were the targets set too low? **Criterion 5** is the one I'd tighten, because
+its target doesn't match its own reason. The reason says a year is the
+*shortest* time I'd call "in production", and nothing in the design ever
+trims the log. The appeal time grew with the log — 5.5 ms at 443 lines, about
+760–810 ms at 46,000 (104× the lines, about 140× the time) — so at that rate
+it passes 1 second at roughly 57,000 lines, about 15 months. It met the target
+only because the measurement stopped before it fails. I'd tighten it to
+**three years: about 138,000 lines (3 × 46,000), appeal still ≤ 1,000 ms.**
+At the measured rate that would take about 2.4 s, so it would miss, which is
+the honest result. (This is a statement about what I'd change, not an edit to
+criteria.md.)
+
+**The Improvement**
+
+What I changed: one thing, in `app.py::server_error` (commit `fa253b5`). The
+call to `audit.log_error(...)` is now inside `try` / `except Exception`. If the
+error record can't be written, the handler logs that too
+(`app.logger.exception("Could not write the error record for %s", ...)`) and
+still returns the JSON 500.
+
+Why: the diagnosis says the handler fails because it can't answer without
+first writing to the log. The fix takes that dependency away: writing the
+record becomes something the handler *tries*, not something it needs.
+
+The scripts got one more argument so the after-run could be saved without
+touching the first results (`python capstone_c2.py 1 after` →
+`results/capstone_c2_after_trial1.json`). Nothing else changed. Criteria 1, 3
+and 4 were re-run against a restarted gunicorn, because a running gunicorn
+keeps the code it started with. The after-run wrote lines 558–671 of the log.
+
+Before and after, same format:
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Every request leaves exactly one complete timing record, and no submitted text | All 8 checks, every trial | 8/8 → **8/8** | 8/8 → **8/8** | 8/8 → **8/8** | MET → **MET** |
+| 2. A crash returns a JSON 500, leaves a record, and the service stays usable | 4 of 4 faults | 3/4 → **4/4** | 3/4 → **4/4** | 3/4 → **4/4** | MISSED → **MET** |
+| 3. A cold start uses at most half of gunicorn's 30 s timeout | 3 of 3 ≤ 15,000 ms | 11,904 → **11,355 ms** | 11,451 → **11,107 ms** | 11,389 → **11,756 ms** | MET → **MET** |
+| 4. A warm request answers within 1 s, even for the longest valid text | A: 12/12 ≤ 1,000 ms; B: 12/12 gaps ≤ 50 ms | 874 / 14.4 → **609 / 5.4 ms** | 847 / 5.6 → **592 / 5.5 ms** | 628 / 5.4 → **552 / 5.3 ms** | MET → **MET** |
+| 5. After a year of log, an appeal still answers within 1 s | 5/5 ≤ 1,000 ms | 810 → **775 ms** | 771 → **791 ms** | 761 → **815 ms** | MET → **MET** |
+
+Real output after the change, `capstone_c2.py`, trial 1 (after):
+
+```
+  a. model signal  status 500  application/json   — all five PASS
+  b. style signal  status 500  application/json   — all five PASS
+  c. combining     status 500  application/json   — all five PASS
+  d. log write     status 500  application/json
+      PASS  status_500
+      PASS  json_error_and_message
+      PASS  no_content_id
+      PASS  follow_up_200
+      PASS  logger_shows_oserror
+```
+
+d's body is now `{"error": "server_error", "message": "Something went wrong on
+our side. Please try again later."}`.
+
+Did it help? **Yes, for what it aimed at:** criterion 2 went from 3/4 to 4/4 in
+all three trials. **Nothing else moved:** criteria 1 and 5 came out the same
+as before, and criteria 3 and 4 stayed within the run-to-run spread I'd
+already seen, so the change had no visible cost on the other paths.
+
+The trade, named: the writer now gets a proper JSON error, but **fault d still
+leaves no line in `audit.jsonl`** — the log can't be written, and the fix
+doesn't change that. The only trace is the logger's output, which under
+gunicorn goes to the terminal and isn't kept anywhere. The logger still shows
+`OSError` twice, but the second one now comes from my new `except` branch
+("Could not write the error record"), not from Flask after my handler
+crashed.
+
+**What's Still Broken**
+
+After the improvement, all five criteria are met. That doesn't mean nothing is
+left:
+
+- **Criterion 5's target was too low** (see *Were the targets set too low?*).
+  At three years of log I'd expect it to miss. *What I'd do:* stop reading the
+  whole log on every appeal — keep a small index from `content_id` to its
+  decision, written next to each decision, or split the log by month.
+  *Why I stopped:* the unit allows one improvement, and I used it on
+  criterion 2's miss. This is also a change to how the log is stored, which
+  needs its own criteria.
+- **A crash during a failed log write still leaves no audit record.** The
+  improvement fixed what the writer sees, not what the log keeps. *What I'd
+  do:* write the error to a second place that doesn't depend on the same file
+  (stderr captured to a file by gunicorn's `--error-logfile`, for example).
+  *Why I stopped:* it's a second change, and it moves into gunicorn's
+  configuration.
+- **Criterion 2 was tested in a test process, not under gunicorn.** The real
+  server can't be made to crash on demand without a "crash switch" in
+  production code, which I chose not to add. So I haven't seen what gunicorn
+  does after a real crash.
+- **Criterion 4 passes with a margin inside its own noise.** The same text took
+  568–847 ms across trials. A busier machine could push one request over
+  1 second.
+- **Not tested:** the first model download from a clean machine (GPT-2 was
+  already cached), and anything other than this one laptop.
+- Still out of scope, as declared in The Shape: the unit 8 detection problems
+  (the one-way disagreement cap, the style clamp at 0.00, careful writing read
+  as AI).
+
+What I'd do next, if this were real and I had another unit: **fix the appeal
+lookup first** — an index from `content_id` to its decision, so an appeal
+costs the same at line 400 and line 400,000. It's the one result here that's
+guaranteed to get worse just by the service running, and the people who pay
+for it are the writers who were wrongly flagged and are trying to appeal.
+
+**How I Used AI**
+
+I used Claude (in Claude Code) as a tutor for the whole capstone. The split:
+Claude explained each milestone, gave me code templates with blanks, checked
+what I wrote and ran checks against scratch copies; I chose the system, the
+shape and every decision, filled in and fixed the code, wrote the criteria
+(in Chinese), ran every real trial and made every commit. Claude drafted
+RUNNING.md's capstone section and these README sections from my measured
+numbers, translated my criteria into English without changing them, and I
+checked and edited all of it. Claude also wrote M2's first timing step itself
+before I asked it to stop and switch to teaching; I then read that code line
+by line, and wrote the rest of M2 myself.
+
+**Moment 1 — the criterion 5 arithmetic (M4).** I asked Claude to add my
+"Why a year" reasoning: 100 submissions a day × 365 = 36,500 decisions, and
+40,000 lines "leaves room for rejections and appeals". Claude checked it
+against my own test step, which pads the log with lines 415–443, and pointed
+out that those 29 lines hold only 23 decisions, so 40,000 lines would hold
+about 31,700 decisions — less than a year, not more. I changed the target to
+46,000 lines (36,500 × 29 / 23) and committed the fix, with its reason, before
+running anything.
+
+**Moment 2 — the c5 script that would have filled my disk (M5).** I filled in
+`TARGET_LINES` as `365 * 24 * 60 * 60`, a year in seconds. Claude stopped me
+before I ran it: that's 31.5 million lines, about 20 GB, on a disk with 25 GB
+free, built in memory on a 16 GB machine. I changed it to 46,000 and added a
+comment with the arithmetic. What I took from it: estimate the size (lines ×
+bytes per line) before running anything that writes files.
+
 ---
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
