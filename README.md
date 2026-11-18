@@ -1961,6 +1961,177 @@ Out of scope:
 - **A dashboard or monitoring stack.** No Grafana, Prometheus or `/metrics`
   endpoint. The log file is the instrument, and a small script reads it back.
 
+**Running It**
+
+Path B: local, with a committed log. The start command, the environment and
+the setup from a clean clone are in [RUNNING.md](RUNNING.md), under
+*Capstone: running it (Path B)*. In short:
+
+```bash
+gunicorn app:app --bind 127.0.0.1:5000 --workers 1
+```
+
+Why not a host. This is arithmetic, not a preference:
+
+| What has to be in memory | Measured / known |
+|---|---|
+| torch + the GPT-2 weights, after scoring one text | **786 MB** peak (`resource.getrusage`, one process) |
+| The GPT-2 weights on disk | 525 MB (`~/.cache/huggingface/hub/models--gpt2`) |
+| A free tier | **512 MB** |
+
+The service is over budget before its first request. A free host also has no
+persistent disk, so the 525 MB download would start again after every idle
+spin-down.
+
+Why one worker. Each gunicorn worker is its own process: it would load its own
+copy of GPT-2, keep its own rate-limit counts (two workers would allow 10 a
+minute, not 5), and `audit.py`'s thread lock can't stop two processes writing
+to the log at once.
+
+What the clean-clone test found. I cloned the repo into a new folder and
+followed RUNNING.md line by line. Three things came up, and RUNNING.md was
+fixed for each:
+
+1. `pip install -r requirements-lock.txt` installed into Python 3.9, not the
+   new `.venv`, and failed on `click==8.5.0`. My shell aliases `pip` to
+   `pip3.9`, and an alias wins over an activated virtual environment.
+   RUNNING.md now says `python -m pip`.
+2. The example `/submit` text had two sentences, so `style_score` came back
+   `null` (fewer than three sentences gives the style signal no reading). A
+   reader would think the second signal was broken. The example now has three.
+3. Closing the terminal didn't stop that clone's gunicorn. My next start in the
+   real repo failed with `Address already in use`, and anything sent to port
+   5000 would have been logged in the clone's folder instead. RUNNING.md's
+   *Stop it* now shows how to find and stop it.
+
+Not tested: the first model download. GPT-2 was already in my cache, so the
+clone never downloaded the 525 MB.
+
+**Instrumentation**
+
+Every request that reaches `/submit` or `/appeal` appends one JSON line to
+`logs/audit.jsonl`: decided, rejected, rate limited, appealed or crashed.
+Lines 1–414 are from units 7–8. Lines 415 onward are in the capstone format.
+
+Fields on **every** capstone record:
+
+| Field | What it holds |
+|---|---|
+| `timestamp` | UTC, to the second (set in `audit.py`, not by the caller) |
+| `endpoint` | `/submit` or `/appeal` |
+| `http_status` | The status code returned: 200, 400, 403, 404, 429 or 500 |
+| `duration_ms` | Milliseconds from the request arriving (`before_request`) to just before its log line is written. The write itself isn't included: it can't time itself into the line it is writing |
+| `event` / `status` | What happened: `decided`, `rejected` (with a `reason`), `appeal` / `under_review`, or `error` |
+
+Extra fields on a **decision**:
+
+| Field | What it holds |
+|---|---|
+| `stage_ms` | Milliseconds per stage: `model` (GPT-2), `style`, `combined` (combining and labelling). Resolution 0.1 ms, so `0.0` means under 0.05 ms |
+| `model_was_loaded` | Whether GPT-2 was already in memory when this request arrived. `false` marks a cold start |
+| `text_chars`, `text_words` | The size of what came in. Words are counted with `text.split()`, the same rule as the minimum-length check |
+| `text_sha256` | The first 16 hex characters of the text's SHA-256. The same text always gives the same fingerprint, but the text can't be read back from it. The text itself is never logged |
+| `guess`, `model_score`, `style_score`, `combined_score`, `label`, `content_id`, `creator_id` | What went out, as in units 7–8 |
+
+A **crash** (500) writes `event: "error"` with `error_type` and
+`error_message` (first 200 characters), plus the timing fields.
+
+These came from one real session: gunicorn running as above, and
+`capstone_session.py` sending all 18 of my unit 7–8 test texts, three bad
+requests, seven submissions from one `creator_id` and one appeal. Twelve of the
+29 lines it produced, unedited (`logs/audit.jsonl`, line numbers on the left):
+
+```
+415 {"timestamp": "2026-11-18T03:00:03+00:00", "content_id": "8f9fb6fb-7881-48b5-a90a-bcf633f918f1", "creator_id": "m3_run_01", "guess": "unsure", "model_score": 0.7891, "style_score": 0.232, "combined_score": 0.622, "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.", "status": "decided", "stage_ms": {"model": 8897.2, "style": 0.5, "combined": 0.0}, "endpoint": "/submit", "http_status": 200, "duration_ms": 8898.4, "model_was_loaded": false, "text_chars": 382, "text_words": 76, "text_sha256": "60517486e15b46a5"}
+416 {"timestamp": "2026-11-18T03:00:03+00:00", "content_id": "9f5094df-5924-44d4-86d5-c4dbb33dd742", "creator_id": "m3_run_02", "guess": "unsure", "model_score": 0.5825, "style_score": 0.5556, "combined_score": 0.5744, "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.", "status": "decided", "stage_ms": {"model": 119.0, "style": 0.3, "combined": 0.0}, "endpoint": "/submit", "http_status": 200, "duration_ms": 120.0, "model_was_loaded": true, "text_chars": 365, "text_words": 60, "text_sha256": "4491d8d0a2f7f65b"}
+419 {"timestamp": "2026-11-18T03:00:03+00:00", "content_id": "e24f4828-01bf-4cf9-9020-7e23585a059f", "creator_id": "m3_run_05", "guess": "human", "model_score": 0.335, "style_score": 0.0, "combined_score": 0.2345, "label": "We think this was most likely written by a person.", "status": "decided", "stage_ms": {"model": 153.0, "style": 0.3, "combined": 0.0}, "endpoint": "/submit", "http_status": 200, "duration_ms": 154.1, "model_was_loaded": true, "text_chars": 462, "text_words": 81, "text_sha256": "5f4bd2509185d471"}
+422 {"timestamp": "2026-11-18T03:00:04+00:00", "content_id": "7c003639-2b48-41e6-bdcc-94ab2b4086f0", "creator_id": "m3_run_08", "guess": "human", "model_score": 0.2636, "style_score": 0.0955, "combined_score": 0.2132, "label": "We think this was most likely written by a person.", "status": "decided", "stage_ms": {"model": 189.6, "style": 1.1, "combined": 0.0}, "endpoint": "/submit", "http_status": 200, "duration_ms": 191.6, "model_was_loaded": true, "text_chars": 556, "text_words": 94, "text_sha256": "b28dcf3f8f6cde79"}
+425 {"timestamp": "2026-11-18T03:00:04+00:00", "content_id": "7597dd53-9a12-43f8-a3ad-59f65610bf6a", "creator_id": "m3_run_11", "guess": "ai", "model_score": 0.8224, "style_score": 0.744, "combined_score": 0.7989, "label": "We think this was most likely written by AI. Nothing happens because of this result. If you think this result is wrong, you can request a review. A person can see things our check can't.", "status": "decided", "stage_ms": {"model": 158.3, "style": 0.3, "combined": 0.0}, "endpoint": "/submit", "http_status": 200, "duration_ms": 159.2, "model_was_loaded": true, "text_chars": 576, "text_words": 98, "text_sha256": "861b6f34bd16101d"}
+429 {"timestamp": "2026-11-18T03:00:05+00:00", "content_id": "5f43dc3e-b974-4972-bcb0-a8536781444d", "creator_id": "m3_run_15", "guess": "unsure", "model_score": 0.4284, "style_score": 0.7275, "combined_score": 0.5181, "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.", "status": "decided", "stage_ms": {"model": 189.2, "style": 0.3, "combined": 0.0}, "endpoint": "/submit", "http_status": 200, "duration_ms": 190.2, "model_was_loaded": true, "text_chars": 599, "text_words": 105, "text_sha256": "136756dec08506e6"}
+433 {"timestamp": "2026-11-18T03:00:06+00:00", "creator_id": null, "event": "rejected", "status": "rejected", "reason": "invalid_json", "endpoint": "/submit", "http_status": 400, "duration_ms": 0.6}
+434 {"timestamp": "2026-11-18T03:00:06+00:00", "creator_id": "m3_bad", "event": "rejected", "status": "rejected", "reason": "text_missing", "endpoint": "/submit", "http_status": 400, "duration_ms": 0.4}
+435 {"timestamp": "2026-11-18T03:00:06+00:00", "creator_id": "m3_bad", "event": "rejected", "status": "rejected", "reason": "text_too_short", "endpoint": "/submit", "http_status": 400, "duration_ms": 0.4}
+440 {"timestamp": "2026-11-18T03:00:06+00:00", "content_id": "eedc47ea-393c-48cb-aa93-282e609ae7fd", "creator_id": "m3_flood", "guess": "unsure", "model_score": 0.6223, "style_score": 0.2867, "combined_score": 0.5216, "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.", "status": "decided", "stage_ms": {"model": 118.2, "style": 0.2, "combined": 0.0}, "endpoint": "/submit", "http_status": 200, "duration_ms": 119.1, "model_was_loaded": true, "text_chars": 323, "text_words": 59, "text_sha256": "f8246924a3f6a603"}
+441 {"timestamp": "2026-11-18T03:00:06+00:00", "creator_id": "m3_flood", "event": "rejected", "status": "rejected", "reason": "rate_limited", "limit": "5 per 1 minute", "endpoint": "/submit", "http_status": 429, "duration_ms": 0.6}
+443 {"timestamp": "2026-11-18T03:00:06+00:00", "content_id": "8f9fb6fb-7881-48b5-a90a-bcf633f918f1", "creator_id": "m3_run_01", "event": "appeal", "status": "under_review", "reasoning": "I wrote this myself.", "endpoint": "/appeal", "http_status": 200, "duration_ms": 5.5}
+```
+
+The failed runs are lines 433–435 (three rejected inputs, `400`) and 441 (rate
+limited, `429`; line 442 is the second one). No request crashed in this session,
+so there is no `error` line in the committed log. The crash path was tested
+in M2 by making `detector.model_signal` raise inside a test process that
+wrote to a scratch log; it returned a JSON `500` and wrote:
+
+```
+{"creator_id": "verify_crash", "event": "error", "status": "error", "error_type": "RuntimeError", "error_message": "simulated model failure", "endpoint": "/submit", "http_status": 500, "duration_ms": 1.7}
+```
+
+What the log already shows:
+
+- **Almost all the time is GPT-2.** On warm requests `model` is 99% of
+  `duration_ms`; `style` is under 1.2 ms and `combined` rounds to 0.0.
+- **The first submission is a cold start.** Line 415 (`model_was_loaded:
+  false`) took 8898 ms, about 52 times a warm request, all of it in `model`.
+- **Warm time grows with the text.** 59–110 words took 117–281 ms, against
+  about 58 ms for a 27-word text in M2. It isn't strictly in step: #3 (75
+  words) took 265 ms, #7 (98 words) 281 ms.
+- **Rejections stop before the model.** 0.4–0.6 ms, every one.
+- **The appeal takes 5.5 ms without touching the model**, because
+  `audit.entries_for` reads the whole log to find the decision. That cost grows
+  with the log.
+- **The server's number is close to what a caller waits.**
+  `capstone_session.py` timed each request from the client side as well: the
+  client saw 3–4.5 ms more than `duration_ms` on every request (8902.9 vs
+  8898.4, 123.9 vs 120.0, 3.7 vs 0.6). That gap is the log write, gunicorn and
+  the local HTTP round trip.
+
+**What It Costs**
+
+There's no API, so the cost is seconds of compute: `duration_ms` on one
+gunicorn worker, wall-clock, CPU only, on an Intel Mac (macOS 15.7). Measured,
+not estimated: `capstone_cost.py` reads the decisions from the M3 session back
+out of `logs/audit.jsonl` (the 18 `m3_run_*` lines, 415–432) and splits them
+by `model_was_loaded`. The flood requests are left out because they repeat one
+short text, which would pull the average down.
+
+```
+$ python capstone_cost.py
+cold   n=  1  mean   8898.4 ms  min   8898.4  max   8898.4
+warm   n= 17  mean    171.5 ms  min    117.4  max    281.0
+
+One warm run: 0.1715 s   one cold start: 8.898 s   (cold ≈ 52× warm)
+
+A. always running, all warm:    100 × 0.1715 = 17.15 s/day
+B. one restart a day:           8.898 + 99 × 0.1715 = 25.87 s/day
+Worst case, every request cold: 100 × 8.898 = 889.8 s/day
+```
+
+**One run costs about 0.17 seconds of compute** (17 warm runs, 59–110 words
+each). Starting the service costs one more 8.9 seconds the first time GPT-2
+loads.
+
+A hundred people a day, one submission each:
+
+- **A — always running:** 100 × 0.1715 s = **17.15 s/day**. This is the cost of
+  each extra person: about 0.17 s.
+- **B — restarted once a day:** the day's first submission is a cold start, the
+  other 99 are warm: 8.898 + 99 × 0.1715 = **25.87 s/day**. One cold start adds
+  about half again to the day. (The script uses the unrounded mean, 0.17148 s;
+  with the rounded 0.1715 the sum comes to 25.88.)
+- **Worst case — every request cold**, as on a host that sleeps when idle:
+  100 × 8.898 s = **889.8 s/day**, about 15 minutes. That's 52 times A.
+
+Limits of this number:
+
+- Only one cold start is in the committed log. Others I saw during M2 checks
+  and the clean-clone test (8.0, 8.8, 9.3, 11.9 and 13.8 s) were in scratch
+  logs, so the cold figure swings by several seconds and one sample doesn't
+  pin it down.
+- Warm cost depends on text length, so a site whose writers send longer pieces
+  would pay more per run, up to GPT-2's 400-token cut-off.
+- This is wall-clock time on my laptop, not billed CPU time. Another machine
+  would give other numbers.
+
 ---
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
