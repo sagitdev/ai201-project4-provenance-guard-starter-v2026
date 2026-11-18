@@ -61,6 +61,10 @@ def elapsed_ms():
     return round((time.perf_counter() - start) * 1000, 1) # 现在的秒表读数减去进门时的读数，得到过了多少秒
     # * 1000 秒换成毫秒 ; round(..., 1) 保留一位小数，避免日志里出现 123.4567890123456789 这种不必要的精度。
 
+def ms_since(t):
+    """Milliseconds since the perf_counter reading t."""
+    return round((time.perf_counter() - t) * 1000, 1)
+
 # 把三个字段打包成一个字典，写进日志。http_status 是响应的状态码，200、400、429 之类的。
 def timing_fields(http_status):
     """
@@ -315,12 +319,22 @@ def submit():
         )
 
     content_id = str(uuid.uuid4())# uuid4() 生成一个随机编号，str() 把它变成字符串，JSON 只认字符串。
-    model_score = detector.model_signal(text)
-    style_score = stylometry.style_signal(text)   
+    
+    t = time.perf_counter() # 调用 model_signal 之前，先记下时间点
+    model_score = detector.model_signal(text) # GPT-2 干活
+    model_ms = ms_since(t) # 调用 model_signal 之后，算出花了多少毫秒
+
+    t = time.perf_counter() # 调用 style_signal 之前，先记下时间点
+    style_score = stylometry.style_signal(text) 
+    style_ms = ms_since(t) # 调用 style_signal 之后，算出花了多少毫秒
+    
 # 现在坏请求会写日志，但正常请求不会：判定做完就返回了，没留下记录。第 4 步要补上这一条。
 # 为什么重要： 下一步的 /appeal 要用 audit.entries_for(content_id) 去日志里查找这个 content_id。正常请求不写日志的话，所有申诉都会返回 404。
+    t = time.perf_counter()
     confidence = scoring.combine_signals(model_score, style_score)
     guess,label = scoring.score_to_label(confidence)
+    combined_ms = ms_since(t) # 计算 combine_signals 和 score_to_label 一共花了多少毫秒
+
  # milestone 4
     audit.log_decision(
         content_id = content_id,
@@ -330,6 +344,10 @@ def submit():
         style_score = style_score,
         combined_score = confidence,
         label = label,
+        stage_ms = {
+            "model": model_ms,
+            "style": style_ms,
+            "combined": combined_ms},
         **timing_fields(200),
     )
 
