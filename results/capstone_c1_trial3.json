@@ -1,0 +1,536 @@
+{
+  "criterion": 1,
+  "trial": 3,
+  "new_lines": 24,
+  "requests": [
+    {
+      "name": "normal 1",
+      "expected": 200,
+      "received": 200
+    },
+    {
+      "name": "normal 2",
+      "expected": 200,
+      "received": 200
+    },
+    {
+      "name": "normal 3",
+      "expected": 200,
+      "received": 200
+    },
+    {
+      "name": "normal 4",
+      "expected": 200,
+      "received": 200
+    },
+    {
+      "name": "normal 5",
+      "expected": 200,
+      "received": 200
+    },
+    {
+      "name": "normal 6",
+      "expected": 200,
+      "received": 200
+    },
+    {
+      "name": "bad: not JSON",
+      "expected": 400,
+      "received": 400
+    },
+    {
+      "name": "bad: JSON list",
+      "expected": 400,
+      "received": 400
+    },
+    {
+      "name": "bad: no creator_id",
+      "expected": 400,
+      "received": 400
+    },
+    {
+      "name": "bad: no text",
+      "expected": 400,
+      "received": 400
+    },
+    {
+      "name": "bad: spaces only",
+      "expected": 400,
+      "received": 400
+    },
+    {
+      "name": "bad: 3 words",
+      "expected": 400,
+      "received": 400
+    },
+    {
+      "name": "bad: 50,001 chars",
+      "expected": 400,
+      "received": 400
+    },
+    {
+      "name": "repeat 1",
+      "expected": 200,
+      "received": 200
+    },
+    {
+      "name": "repeat 2",
+      "expected": 200,
+      "received": 200
+    },
+    {
+      "name": "repeat 3",
+      "expected": 200,
+      "received": 200
+    },
+    {
+      "name": "repeat 4",
+      "expected": 200,
+      "received": 200
+    },
+    {
+      "name": "repeat 5",
+      "expected": 200,
+      "received": 200
+    },
+    {
+      "name": "repeat 6",
+      "expected": 429,
+      "received": 429
+    },
+    {
+      "name": "repeat 7",
+      "expected": 429,
+      "received": 429
+    },
+    {
+      "name": "appeal: valid",
+      "expected": 200,
+      "received": 200
+    },
+    {
+      "name": "appeal: attestation",
+      "expected": 400,
+      "received": 400
+    },
+    {
+      "name": "appeal: not the owner",
+      "expected": 403,
+      "received": 403
+    },
+    {
+      "name": "appeal: no such id",
+      "expected": 404,
+      "received": 404
+    }
+  ],
+  "text_matches": {
+    "I worked for six years in the luxury ret": 0,
+    "I love pop music, new Jazz and some clas": 0,
+    "During my first course in the master pro": 0,
+    "Sometimes I focus too much on supporting": 0,
+    "I go to the PCC library everyday, for st": 0,
+    "This is a repository that shows what got": 0,
+    "I’m very sorry, but I forgot to submit l": 0,
+    "I have two cats. One is a white cat call": 0
+  },
+  "checks": {
+    "exactly_24_new_lines": true,
+    "received_as_planned": true,
+    "status_matches_log_24_of_24": true,
+    "every_line_endpoint_and_duration": true,
+    "eleven_complete_decisions": true,
+    "exactly_one_cold": true,
+    "repeat_fingerprints_identical": true,
+    "eight_texts_zero_matches": true
+  },
+  "met": true,
+  "new_records": [
+    {
+      "timestamp": "2026-11-18T07:25:56+00:00",
+      "content_id": "c93d3ef4-2aca-46a1-a256-4f230a7c5deb",
+      "creator_id": "m5_c1_t3_n1",
+      "guess": "unsure",
+      "model_score": 0.5825,
+      "style_score": 0.5556,
+      "combined_score": 0.5744,
+      "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.",
+      "status": "decided",
+      "stage_ms": {
+        "model": 6692.5,
+        "style": 0.5,
+        "combined": 0.0
+      },
+      "endpoint": "/submit",
+      "http_status": 200,
+      "duration_ms": 6694.0,
+      "model_was_loaded": false,
+      "text_chars": 365,
+      "text_words": 60,
+      "text_sha256": "4491d8d0a2f7f65b"
+    },
+    {
+      "timestamp": "2026-11-18T07:25:56+00:00",
+      "content_id": "7304bb8d-fa8d-4e41-b64a-490f006ff6e0",
+      "creator_id": "m5_c1_t3_n2",
+      "guess": "unsure",
+      "model_score": 0.3977,
+      "style_score": 0.7439,
+      "combined_score": 0.5016,
+      "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.",
+      "status": "decided",
+      "stage_ms": {
+        "model": 155.2,
+        "style": 0.3,
+        "combined": 0.0
+      },
+      "endpoint": "/submit",
+      "http_status": 200,
+      "duration_ms": 156.1,
+      "model_was_loaded": true,
+      "text_chars": 440,
+      "text_words": 75,
+      "text_sha256": "6407dd43fb58add6"
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "content_id": "10dd23c3-c65e-4371-bb76-b54ae9e9f3cc",
+      "creator_id": "m5_c1_t3_n3",
+      "guess": "unsure",
+      "model_score": 0.4878,
+      "style_score": 0.7747,
+      "combined_score": 0.5739,
+      "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.",
+      "status": "decided",
+      "stage_ms": {
+        "model": 117.8,
+        "style": 0.2,
+        "combined": 0.0
+      },
+      "endpoint": "/submit",
+      "http_status": 200,
+      "duration_ms": 118.8,
+      "model_was_loaded": true,
+      "text_chars": 405,
+      "text_words": 70,
+      "text_sha256": "2f16365dcec92568"
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "content_id": "c14d8957-4dfe-44f9-b8ac-3d1836f24f12",
+      "creator_id": "m5_c1_t3_n4",
+      "guess": "human",
+      "model_score": 0.335,
+      "style_score": 0.0,
+      "combined_score": 0.2345,
+      "label": "We think this was most likely written by a person.",
+      "status": "decided",
+      "stage_ms": {
+        "model": 135.8,
+        "style": 0.2,
+        "combined": 0.0
+      },
+      "endpoint": "/submit",
+      "http_status": 200,
+      "duration_ms": 136.7,
+      "model_was_loaded": true,
+      "text_chars": 462,
+      "text_words": 81,
+      "text_sha256": "5f4bd2509185d471"
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "content_id": "bdf372f3-c5ec-4413-a75d-2d82fefdc80b",
+      "creator_id": "m5_c1_t3_n5",
+      "guess": "unsure",
+      "model_score": 0.5394,
+      "style_score": 0.5033,
+      "combined_score": 0.5286,
+      "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.",
+      "status": "decided",
+      "stage_ms": {
+        "model": 141.4,
+        "style": 0.2,
+        "combined": 0.0
+      },
+      "endpoint": "/submit",
+      "http_status": 200,
+      "duration_ms": 142.3,
+      "model_was_loaded": true,
+      "text_chars": 429,
+      "text_words": 82,
+      "text_sha256": "9471a01595c15b7d"
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "content_id": "9efe301c-1517-4202-b060-6855b9e0eb3a",
+      "creator_id": "m5_c1_t3_n6",
+      "guess": "unsure",
+      "model_score": 0.5702,
+      "style_score": 0.5307,
+      "combined_score": 0.5584,
+      "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.",
+      "status": "decided",
+      "stage_ms": {
+        "model": 166.4,
+        "style": 0.3,
+        "combined": 0.0
+      },
+      "endpoint": "/submit",
+      "http_status": 200,
+      "duration_ms": 167.3,
+      "model_was_loaded": true,
+      "text_chars": 520,
+      "text_words": 98,
+      "text_sha256": "dd5eda793496cbc7"
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "creator_id": null,
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "invalid_json",
+      "endpoint": "/submit",
+      "http_status": 400,
+      "duration_ms": 0.6
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "creator_id": null,
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "invalid_json",
+      "endpoint": "/submit",
+      "http_status": 400,
+      "duration_ms": 0.4
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "creator_id": null,
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "creator_id_missing",
+      "endpoint": "/submit",
+      "http_status": 400,
+      "duration_ms": 0.4
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "creator_id": "m5_bad",
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "text_missing",
+      "endpoint": "/submit",
+      "http_status": 400,
+      "duration_ms": 0.8
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "creator_id": "m5_bad",
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "text_empty",
+      "endpoint": "/submit",
+      "http_status": 400,
+      "duration_ms": 0.4
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "creator_id": "m5_bad",
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "text_too_short",
+      "endpoint": "/submit",
+      "http_status": 400,
+      "duration_ms": 0.4
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "creator_id": "m5_bad",
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "text_too_long",
+      "endpoint": "/submit",
+      "http_status": 400,
+      "duration_ms": 1.1
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "content_id": "0ffa5334-8a05-483f-9788-1971ff5b3c26",
+      "creator_id": "m5_c1_t3_repeat",
+      "guess": "unsure",
+      "model_score": 0.6223,
+      "style_score": 0.2867,
+      "combined_score": 0.5216,
+      "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.",
+      "status": "decided",
+      "stage_ms": {
+        "model": 121.1,
+        "style": 0.2,
+        "combined": 0.0
+      },
+      "endpoint": "/submit",
+      "http_status": 200,
+      "duration_ms": 121.8,
+      "model_was_loaded": true,
+      "text_chars": 323,
+      "text_words": 59,
+      "text_sha256": "f8246924a3f6a603"
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "content_id": "6c75867d-105b-4a06-b792-df06f500a7e9",
+      "creator_id": "m5_c1_t3_repeat",
+      "guess": "unsure",
+      "model_score": 0.6223,
+      "style_score": 0.2867,
+      "combined_score": 0.5216,
+      "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.",
+      "status": "decided",
+      "stage_ms": {
+        "model": 130.8,
+        "style": 0.3,
+        "combined": 0.0
+      },
+      "endpoint": "/submit",
+      "http_status": 200,
+      "duration_ms": 131.7,
+      "model_was_loaded": true,
+      "text_chars": 323,
+      "text_words": 59,
+      "text_sha256": "f8246924a3f6a603"
+    },
+    {
+      "timestamp": "2026-11-18T07:25:57+00:00",
+      "content_id": "a3fa455b-7ad1-405b-a6b3-bd0c11cc1af7",
+      "creator_id": "m5_c1_t3_repeat",
+      "guess": "unsure",
+      "model_score": 0.6223,
+      "style_score": 0.2867,
+      "combined_score": 0.5216,
+      "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.",
+      "status": "decided",
+      "stage_ms": {
+        "model": 154.8,
+        "style": 0.2,
+        "combined": 0.0
+      },
+      "endpoint": "/submit",
+      "http_status": 200,
+      "duration_ms": 155.8,
+      "model_was_loaded": true,
+      "text_chars": 323,
+      "text_words": 59,
+      "text_sha256": "f8246924a3f6a603"
+    },
+    {
+      "timestamp": "2026-11-18T07:25:58+00:00",
+      "content_id": "8a511718-4e6d-48c4-beb2-a8e958036d67",
+      "creator_id": "m5_c1_t3_repeat",
+      "guess": "unsure",
+      "model_score": 0.6223,
+      "style_score": 0.2867,
+      "combined_score": 0.5216,
+      "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.",
+      "status": "decided",
+      "stage_ms": {
+        "model": 114.3,
+        "style": 0.2,
+        "combined": 0.0
+      },
+      "endpoint": "/submit",
+      "http_status": 200,
+      "duration_ms": 115.1,
+      "model_was_loaded": true,
+      "text_chars": 323,
+      "text_words": 59,
+      "text_sha256": "f8246924a3f6a603"
+    },
+    {
+      "timestamp": "2026-11-18T07:25:58+00:00",
+      "content_id": "68767fdd-8942-4d70-8fd4-55faed4b91c4",
+      "creator_id": "m5_c1_t3_repeat",
+      "guess": "unsure",
+      "model_score": 0.6223,
+      "style_score": 0.2867,
+      "combined_score": 0.5216,
+      "label": "We can't tell how this was written — our check has its limits. Nothing happens because of this result. If you'd like a person to take a look, you can request a review. A review can make the result more objective.",
+      "status": "decided",
+      "stage_ms": {
+        "model": 113.2,
+        "style": 0.2,
+        "combined": 0.0
+      },
+      "endpoint": "/submit",
+      "http_status": 200,
+      "duration_ms": 114.1,
+      "model_was_loaded": true,
+      "text_chars": 323,
+      "text_words": 59,
+      "text_sha256": "f8246924a3f6a603"
+    },
+    {
+      "timestamp": "2026-11-18T07:25:58+00:00",
+      "creator_id": "m5_c1_t3_repeat",
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "rate_limited",
+      "limit": "5 per 1 minute",
+      "endpoint": "/submit",
+      "http_status": 429,
+      "duration_ms": 0.6
+    },
+    {
+      "timestamp": "2026-11-18T07:25:58+00:00",
+      "creator_id": "m5_c1_t3_repeat",
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "rate_limited",
+      "limit": "5 per 1 minute",
+      "endpoint": "/submit",
+      "http_status": 429,
+      "duration_ms": 0.5
+    },
+    {
+      "timestamp": "2026-11-18T07:25:58+00:00",
+      "content_id": "c93d3ef4-2aca-46a1-a256-4f230a7c5deb",
+      "creator_id": "m5_c1_t3_n1",
+      "event": "appeal",
+      "status": "under_review",
+      "reasoning": "I wrote this myself.",
+      "endpoint": "/appeal",
+      "http_status": 200,
+      "duration_ms": 9.8
+    },
+    {
+      "timestamp": "2026-11-18T07:25:58+00:00",
+      "creator_id": "m5_c1_t3_n1",
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "attestation_required",
+      "endpoint": "/appeal",
+      "http_status": 400,
+      "duration_ms": 0.2
+    },
+    {
+      "timestamp": "2026-11-18T07:25:58+00:00",
+      "creator_id": "m5_c1_t3_n2",
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "not_your_content",
+      "endpoint": "/appeal",
+      "http_status": 403,
+      "duration_ms": 6.8
+    },
+    {
+      "timestamp": "2026-11-18T07:25:58+00:00",
+      "creator_id": "m5_c1_t3_n1",
+      "event": "rejected",
+      "status": "rejected",
+      "reason": "content_not_found",
+      "endpoint": "/appeal",
+      "http_status": 404,
+      "duration_ms": 7.2
+    }
+  ]
+}
